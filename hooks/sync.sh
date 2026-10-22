@@ -42,6 +42,11 @@ project_file() {
   esac
   return 1
 }
+# A coarse filter git applies itself, which spares the loop over a project's
+# untracked files the thousands that its Git ignores (builds, dependencies).
+# project_file has the final word, so this list only has to cover it.
+PROJECT_SPECS=(':(glob)**/CLAUDE.md' ':(glob)**/CLAUDE.local.md' ':(glob)**/AGENTS.md'
+  ':(glob)**/.claude/**' ':(glob)**/.vscode/**')
 
 # Plain stdout of a SessionStart hook lands in Claude's context, and git prints
 # conflict notices there even with -q. Only finish() reaches the real stdout,
@@ -106,11 +111,17 @@ excluded() {
 }
 
 # Source paths of the managed roots, for a git add that touches nothing else.
-# One call covers them all unless a root is not managed.
+# A root chezmoi does not manage fails the whole call, so only the roots in
+# $managed go in; one emptied by this run's deletions still fails it, hence
+# the call per root as a fallback.
 source_roots() {
-  chezmoi source-path "${ROOTS[@]}" 2>/dev/null && return 0
-  local r
+  local r roots=()
   for r in "${ROOTS[@]}"; do
+    [[ $'\n'$managed == *$'\n'"$r"$'\n'* || $'\n'$managed == *$'\n'"$r"/* ]] && roots+=("$r")
+  done
+  [ ${#roots[@]} -gt 0 ] || return 0
+  chezmoi source-path "${roots[@]}" 2>/dev/null && return 0
+  for r in "${roots[@]}"; do
     chezmoi source-path "$r" 2>/dev/null
   done
 }
@@ -228,7 +239,11 @@ if [ ${#added[@]} -gt 0 ]; then
     exit 0
   }
   unremove "$src/.chezmoiremove"
+  for f in "${added[@]}"; do managed+=$'\n'$f; done
 fi
+# The roots as they are after the capture, a root just created included. The
+# trees below reuse $managed, so this cannot wait for the commit.
+sources+=$'\n'$(source_roots)
 
 # Trees: each project, the VS Code user folder, and the GitHub CLI folder is
 # its own chezmoi source under .dotfiles-sync, applied to a destination that
@@ -315,7 +330,7 @@ capture_tree() {
     : >"$mark.next"
     while IFS= read -r -d '' path; do
       project_file "$path" && paths+=("$path") && list+=$path$'\n'
-    done < <(git ls-files --others --exclude=node_modules -z)
+    done < <(git ls-files --others --exclude=node_modules -z -- "${PROJECT_SPECS[@]}")
     # The same candidates as at the last sync and none modified since: no
     # local change, so the chezmoi calls that make most of a run are skipped.
     # A deletion, an addition, or a file the project starts tracking changes
@@ -389,7 +404,6 @@ cd "$HOME" || exit 0
 # emptied by deletions and a root just created are both staged. git add
 # rejects a pathspec that matches nothing, which .chezmoiremove is until the
 # first deletion.
-sources+=$'\n'$(source_roots)
 tracked=()
 while IFS= read -r p; do
   [ -n "$p" ] || continue

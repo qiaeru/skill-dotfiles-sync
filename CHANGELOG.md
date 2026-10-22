@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - `__pycache__/`, `.DS_Store`, and `Thumbs.db` files no longer sync.
+- A sync with nothing to do runs faster when projects hold many files their Git ignores, or when a home folder such as `~/.config/git` does not exist.
 
 ## [1.0.0] - 2026-10-22
 
