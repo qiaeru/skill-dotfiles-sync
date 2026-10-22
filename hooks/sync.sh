@@ -165,6 +165,13 @@ src=$(chezmoi source-path 2>/dev/null) || exit 0
 git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 cd "$HOME" || exit 0
 
+# The skill holds the sync while it sets up a machine: another session must
+# not sync before the person has reviewed what the first apply would change.
+if [ -e "$src/.git/dotfiles-sync.hold" ]; then
+  say "on hold until the setup of this machine is finished; ask Claude to finish the dotfiles-sync setup"
+  exit 0
+fi
+
 # A hook has no terminal to answer a credentials prompt.
 export GIT_TERMINAL_PROMPT=0
 

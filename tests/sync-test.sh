@@ -208,6 +208,12 @@ on D
 echo '{"model":"D"}' >.claude/settings.json
 setup_config
 chezmoi init "$SB/remote.git" >/dev/null
+# The hold the skill sets during the setup: no sync until it is lifted.
+: >"$(src)/.git/dotfiles-sync.hold"
+out=$(sync)
+check "a held sync says so and changes nothing" \
+  'grep -q "on hold" <<<"$out" && [ ! -e .claude/skills/from-a/SKILL.md ] && [ "$(git -C "$(src)" status --porcelain)" = "" ]'
+rm "$(src)/.git/dotfiles-sync.hold"
 sync >/dev/null
 check "a file never applied here is fetched, not deleted" \
   '[ -f .claude/skills/from-a/SKILL.md ] && git --git-dir="$SB/remote.git" ls-tree -r --name-only main | grep -q from-a'

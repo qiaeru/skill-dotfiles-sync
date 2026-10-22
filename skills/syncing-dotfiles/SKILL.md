@@ -48,13 +48,26 @@ chezmoi managed --include=files | grep -E '^\.(claude|gitconfig|config/git|ssh)'
 ls "$(chezmoi source-path)/.dotfiles-sync/projects"; cat ~/.config/dotfiles-sync/projects
 ```
 
-No chezmoi means the setup below. A source repo with none of these files means the first machine. A source repo behind or ahead of `origin` means a sync that could not finish; a stuck conflict is handled below. On Windows the hook runs in Git Bash, which comes with Git for Windows.
+No chezmoi means the setup below. A source repo with none of these files means the first machine. A `dotfiles-sync.hold` file in the source repo's `.git` means a setup left unfinished: resume it at the review step of the matching procedure below. A source repo behind or ahead of `origin` means a sync that could not finish; a stuck conflict is handled below. On Windows the hook runs in Git Bash, which comes with Git for Windows.
 
 ## First machine
 
+Once the source repo exists, every Claude Code session that starts or ends on this machine runs a sync. Step 5 puts the hook on hold with a `dotfiles-sync.hold` file in the source repo's `.git`, and step 7 lifts it; settle every choice before step 5 all the same.
+
 1. Install chezmoi: `winget install twpayne.chezmoi` on Windows, `brew install chezmoi` on macOS, the distribution package or `sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin` on Linux. Recent chezmoi has age built in, so age needs no install. Open a new terminal or session if the command is not found yet.
-2. Generate the key: `chezmoi age-keygen -o ~/.config/chezmoi/key.txt`. The command prints the public key (`age1…`). Tell the person to store the content of `key.txt` in their password manager now: every other machine needs it, and without it the repo cannot be decrypted. It never goes into Git.
-3. Write `~/.config/chezmoi/chezmoi.toml` (on Windows too, `~/.config` under the user profile):
+2. Ask, in one go: the name of the private repo (suggest `dotfiles`), which domains to sync, and where the person keeps the projects whose untracked files should travel. Read [references/git.md](references/git.md) if `~/.gitconfig` holds values that must differ per machine, and move them now. Then list what the first sync would take from those projects, a superset of the allow-list:
+
+   ```bash
+   for r in <folder>/*/; do
+     git -C "$r" ls-files --others --exclude=node_modules -- ':(glob)**/CLAUDE.md' \
+       ':(glob)**/CLAUDE.local.md' ':(glob)**/AGENTS.md' ':(glob)**/.claude/**' ':(glob)**/.vscode/**' |
+       sed "s|^|$r|"
+   done
+   ```
+
+   Point out credentials (keys, tokens, service-account JSON) and generated files, and ask which stay local.
+3. Generate the key: `chezmoi age-keygen -o ~/.config/chezmoi/key.txt`. The command prints the public key (`age1…`). Tell the person to store the content of `key.txt` in their password manager now: every other machine needs it, and without it the repo cannot be decrypted. It never goes into Git.
+4. Write `~/.config/chezmoi/chezmoi.toml` (on Windows too, `~/.config` under the user profile):
 
    ```toml
    encryption = "age"
@@ -63,27 +76,28 @@ No chezmoi means the setup below. A source repo with none of these files means t
      recipient = "age1..."
    ```
 
-4. Create the source repo. Ciphertext must not go through line-ending conversion, hence the `.gitattributes`:
+5. Create the source repo, then write the answers of step 2 right away. Ciphertext must not go through line-ending conversion, hence the `.gitattributes`:
 
    ```bash
    chezmoi init
    src=$(chezmoi source-path)
+   touch "$src/.git/dotfiles-sync.hold"
    git -C "$src" checkout -q -b main 2>/dev/null || true
    echo '* -text' > "$src/.gitattributes"
    git -C "$src" add .gitattributes && git -C "$src" commit -q -m "chore: init"
    ```
 
-5. Create the private remote. Ask for a name and suggest `dotfiles`. With `gh` authenticated: `gh repo create <name> --private --source "$src" --remote origin --push`. Otherwise have the person create an empty private repo, then `git -C "$src" remote add origin <url>` and `git -C "$src" push -u origin main`.
-6. Before the first sync, ask which domains to sync. To leave a home domain out, add its root (`.ssh`, or `.gitconfig` and `.config/git`) to `.chezmoiignore` in the source repo; for VS Code or the GitHub CLI, see [references/vscode.md](references/vscode.md) or [references/github-cli.md](references/github-cli.md). Ask where the person keeps the projects whose untracked files should travel, and write those folders to `~/.config/dotfiles-sync/projects` as [references/projects.md](references/projects.md) shows. Then read [references/git.md](references/git.md) if `~/.gitconfig` holds values that must differ per machine.
-7. Run the first sync: `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh"`. It prints nothing on success. Check with `chezmoi managed --include=files` and `git -C "$src" log --oneline -3`, then show the person the list of synced files and ask whether anything there should stay local (see exclusions below). Offer to sync a private key only if they ask; [references/ssh.md](references/ssh.md) covers it.
+   To leave a home domain out, add its root (`.ssh`, or `.gitconfig` and `.config/git`) to `.chezmoiignore` in the source repo; for VS Code or the GitHub CLI, see [references/vscode.md](references/vscode.md) or [references/github-cli.md](references/github-cli.md). A project file that stays local goes to `.dotfiles-sync/projects/<name>/.chezmoiignore`, a path relative to the project (`**/__pycache__` style globs work). Write the project folders to `~/.config/dotfiles-sync/projects` as [references/projects.md](references/projects.md) shows.
+6. Create the private remote. With `gh` authenticated: `gh repo create <name> --private --source "$src" --remote origin --push`. Otherwise have the person create an empty private repo, then `git -C "$src" remote add origin <url>` and `git -C "$src" push -u origin main`.
+7. Lift the hold and run the first sync: `rm "$src/.git/dotfiles-sync.hold"`, then `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh"`. It prints nothing on success. Check with `chezmoi managed --include=files` and `git -C "$src" log --oneline -3`, then show the person the list of synced files and ask whether anything there should stay local (see exclusions below). Offer to sync a private key only if they ask; [references/ssh.md](references/ssh.md) covers it.
 
 ## Another machine
 
-Once the repo is cloned, the next sync settles every file that exists both here and in the repo but was never applied: the local version wins and replaces the repo's on every machine. Files the repo holds and this machine lacks are only fetched. Review before that sync, and finish the procedure in this session, since ending it runs the hook.
+Once the repo is cloned, the next sync settles every file that exists both here and in the repo but was never applied: the local version wins and replaces the repo's on every machine. Files the repo holds and this machine lacks are only fetched. Review before that sync. Step 3 puts the hook on hold right after the clone, so no other session syncs during the review, and step 6 lifts it.
 
 1. Install chezmoi as above.
 2. Restore the key: have the person paste the content of `key.txt` from their password manager into `~/.config/chezmoi/key.txt`. Write the same `chezmoi.toml`, with the public key on the `# public key:` line of `key.txt`.
-3. Clone without applying: `chezmoi init <repo-url>`. Ask where this machine keeps its projects and write its own `~/.config/dotfiles-sync/projects` (see [references/projects.md](references/projects.md)); `ls "$(chezmoi source-path)/.dotfiles-sync/projects"` lists the project names the repo already holds.
+3. Clone without applying, and hold the sync at once: `chezmoi init <repo-url> && touch "$(chezmoi source-path)/.git/dotfiles-sync.hold"`. Ask where this machine keeps its projects and write its own `~/.config/dotfiles-sync/projects` (see [references/projects.md](references/projects.md)); `ls "$(chezmoi source-path)/.dotfiles-sync/projects"` lists the project names the repo already holds.
 4. Show what would change: `chezmoi diff` on each root the repo holds (`.claude`, `.gitconfig`, `.config/git`, `.ssh`), then on each tree the repo holds for a folder this machine has. The same rule applies there, so a local VS Code `settings.json` that differs would replace the repo's on every machine:
 
    ```bash
@@ -95,7 +109,7 @@ Once the repo is cloned, the next sync settles every file that exists both here 
 
    The folders per OS are in [references/vscode.md](references/vscode.md) and [references/github-cli.md](references/github-cli.md); run the last line for each project already cloned here. For each existing local file that differs, ask which version wins. Back up the local ones first (for example `cp -r ~/.claude ~/.claude.bak-$(date +%F)`, and the same for `~/.ssh` and `~/.gitconfig`) and say where the copies are. A `~/.gitconfig` that differs only by machine-specific values is the case [references/git.md](references/git.md) solves.
 5. Apply the repo versions: `chezmoi apply <root>`, or `chezmoi apply <path>` file by file when some local versions should win. For a tree, put the same `--source` and `--destination` before `apply`. A file left out keeps its local version, and the sync sends it to the other machines.
-6. Run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh"`. Files present only on this machine are added to the repo at that point.
+6. Lift the hold and sync: `rm "$src/.git/dotfiles-sync.hold"`, then `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh"`. Files present only on this machine are added to the repo at that point.
 
 ## Conflict
 
