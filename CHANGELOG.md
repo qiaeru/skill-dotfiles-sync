@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - The setup puts the sync on hold until it is finished, so another session cannot sync a new machine before its files have been reviewed.
+- The skill explains how to drop a deleted or abandoned project from the sync.
 
 ### Changed
 

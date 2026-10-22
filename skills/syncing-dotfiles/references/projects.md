@@ -27,6 +27,10 @@ After `git clone` on a machine whose list covers the folder, the next sync bring
 
 Deleting a whole project folder deletes nothing on the other machines. Deleting one synced file inside it does.
 
+## Drop a project
+
+A deleted or abandoned project keeps its files in the source repo, and any machine with a clone of that name gets them back. To drop it from the sync for good, delete `.dotfiles-sync/projects/<name>` in the source repo, then sync. The files stay in every existing clone.
+
 ## A file the project starts tracking
 
 When a synced file gets committed to the project's Git, the hook stops managing it and writes its path to the project's `.chezmoiignore` in the source repo, so a machine that has not pulled the project yet does not add it back. The file stays on every disk, and from then on travels with the project. To sync it through the hook again, untrack it in the project's Git and remove its line from `.dotfiles-sync/projects/<name>/.chezmoiignore`.
