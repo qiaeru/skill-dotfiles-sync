@@ -78,6 +78,8 @@ echo '{"model":"opus"}' >.claude/settings.json
 echo '# global' >.claude/CLAUDE.md
 echo 'skill' >.claude/skills/foo/SKILL.md
 echo 'SECRET=1' >.claude/skills/foo/.env
+mkdir -p .claude/skills/foo/__pycache__
+echo 'bytecode' >.claude/skills/foo/__pycache__/x.pyc
 echo 'cloud' >.claude/skills/synced/x/SKILL.md
 echo 'cmd' >.claude/commands/hi.md
 echo '{"token":1}' >.claude/.credentials.json
@@ -105,8 +107,8 @@ remote_files=$(git --git-dir="$SB/remote.git" ls-tree -r --name-only main)
 check "first sync prints nothing" '[ -z "$out" ]'
 check "allow-listed files reach the remote" \
   'grep -q settings.json <<<"$remote_files" && grep -q skills/foo/encrypted_SKILL.md <<<"$remote_files" && grep -q commands/encrypted_hi.md <<<"$remote_files"'
-check "secrets, claude.ai skills, and history stay out" \
-  '! grep -Eq "\.env|credentials|synced|projects" <<<"$remote_files"'
+check "secrets, caches, claude.ai skills, and history stay out" \
+  '! grep -Eq "\.env|credentials|pycache|synced|projects" <<<"$remote_files"'
 check "Git and SSH config reach the remote" \
   'grep -q encrypted_dot_gitconfig <<<"$remote_files" && grep -q git/encrypted_ignore <<<"$remote_files" && grep -q ssh/encrypted_config.age <<<"$remote_files" && grep -q config.d/encrypted_work <<<"$remote_files" && grep -q encrypted_id_ed25519.pub <<<"$remote_files"'
 check "private keys, known_hosts, and other dotfiles stay out" \

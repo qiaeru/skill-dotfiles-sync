@@ -91,7 +91,10 @@ excluded() {
   esac
   case "${1##*/}" in
     .credentials.json | credentials.json | .env | .env.*) return 0 ;;
+    # Caches a tool or an OS writes next to a skill's scripts.
+    .DS_Store | Thumbs.db) return 0 ;;
   esac
+  case "/$1" in */__pycache__/*) return 0 ;; esac
   # chezmoi add fails the whole batch on an ignored path, so the user's
   # .chezmoiignore is applied here first.
   local p
