@@ -1,0 +1,16 @@
+{
+  "name": "skill-dotfiles-sync",
+  "owner": {
+    "name": "Qiaeru"
+  },
+  "metadata": {
+    "description": "Marketplace for the dotfiles-sync plugin: hooks and a skill that sync the Claude Code, Git, SSH, project, VS Code, and GitHub CLI config across machines, encrypted."
+  },
+  "plugins": [
+    {
+      "name": "dotfiles-sync",
+      "source": "./",
+      "description": "Keep your dotfiles in sync across machines: the global Claude Code config, the Git and SSH config, the CLAUDE.md and .claude/ files your projects keep out of Git, and the VS Code and GitHub CLI settings, encrypted with age in a private Git repo through chezmoi. Syncs on its own at session start and end; a skill handles setup, new machines, and conflicts."
+    }
+  ]
+}

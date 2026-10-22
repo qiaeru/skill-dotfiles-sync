@@ -1,0 +1,14 @@
+// Markdown hygiene for the repo. Prose is written one paragraph per logical
+// line, so no line-length limit. Italics use underscores, bold uses
+// asterisks, per the conventions in the dev notes. CLAUDE.md is gitignored
+// (absent in CI), so it is excluded to keep local runs and CI aligned.
+{
+  "config": {
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD049": { "style": "underscore" },
+    "MD050": { "style": "asterisk" }
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["node_modules/**", "CLAUDE.md"]
+}

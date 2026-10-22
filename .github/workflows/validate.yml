@@ -1,0 +1,72 @@
+# Repo invariants, markdown, manifests, and shell lint run once on Linux;
+# the end-to-end test of the hook runs on Linux, on Windows, where the hook
+# goes through Git Bash, and on macOS under the system bash 3.2. npx pulls
+# the latest Claude Code CLI and the test the latest chezmoi, so an upstream
+# regression can turn the job red without a repo change, which is wanted; the
+# weekly schedule catches it between pushes.
+name: Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Check repo invariants
+        run: node .github/scripts/validate.mjs
+      - name: Lint the shell scripts
+        run: shellcheck hooks/sync.sh tests/sync-test.sh
+      - name: Check markdown hygiene
+        run: npx -y markdownlint-cli2
+      - name: Validate the plugin manifests
+        run: npx -y @anthropic-ai/claude-code plugin validate .
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
+      - name: Install chezmoi
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dir="$RUNNER_TEMP/chezmoi"
+          mkdir -p "$dir"
+          if [ "$RUNNER_OS" = Windows ]; then
+            gh release download -R twpayne/chezmoi -p 'chezmoi_*_windows_amd64.zip' -D "$dir"
+            unzip -q "$dir"/*.zip chezmoi.exe -d "$dir"
+          elif [ "$RUNNER_OS" = macOS ]; then
+            gh release download -R twpayne/chezmoi -p 'chezmoi_*_darwin_arm64.tar.gz' -D "$dir"
+            tar -xzf "$dir"/*.tar.gz -C "$dir" chezmoi
+          else
+            gh release download -R twpayne/chezmoi -p 'chezmoi_*_linux_amd64.tar.gz' -D "$dir"
+            tar -xzf "$dir"/*.tar.gz -C "$dir" chezmoi
+          fi
+          echo "$dir" >> "$GITHUB_PATH"
+      - name: Run the end-to-end test
+        run: |
+          chezmoi --version
+          # The system bash on macOS, which a hook gets unless PATH says otherwise.
+          if [ "$RUNNER_OS" = macOS ]; then /bin/bash tests/sync-test.sh; else bash tests/sync-test.sh; fi

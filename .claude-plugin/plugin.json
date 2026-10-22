@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "dotfiles-sync",
+  "description": "Keep your dotfiles in sync across machines: the global Claude Code config, the Git and SSH config, the CLAUDE.md and .claude/ files your projects keep out of Git, and the VS Code and GitHub CLI settings, encrypted with age in a private Git repo through chezmoi. Syncs on its own at session start and end; a skill handles setup, new machines, and conflicts.",
+  "keywords": ["sync", "dotfiles", "chezmoi", "age", "encryption", "settings", "git", "ssh", "vscode", "projects", "hooks", "skill"],
+  "version": "1.0.0",
+  "author": {
+    "name": "Qiaeru"
+  },
+  "homepage": "https://github.com/qiaeru/skill-dotfiles-sync",
+  "repository": "https://github.com/qiaeru/skill-dotfiles-sync",
+  "license": "MIT"
+}

@@ -1,0 +1,28 @@
+{
+  "description": "Sync the Claude Code, Git, SSH, project, VS Code, and GitHub CLI config through chezmoi when a session starts and when it ends.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
