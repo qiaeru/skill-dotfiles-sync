@@ -30,7 +30,7 @@ The hook reaches four places in your home folder (`~/.claude`, `~/.gitconfig`, `
 | Git | `~/.gitconfig`, `~/.config/git/config`, `~/.config/git/ignore`, `~/.config/git/attributes` | |
 | SSH | `~/.ssh/config`, `~/.ssh/config.d/`, public keys (`*.pub`) | private keys, `known_hosts`, `authorized_keys` |
 | Projects | files the project's Git does not track, at any depth: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.mcp.json`, `.claude/settings.json` and `settings.local.json`, the `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/` folders, and the `settings`, `launch`, `tasks`, `extensions` JSON files and `*.code-snippets` of `.vscode/` | |
-| VS Code | `settings.json`, `keybindings.json`, `snippets/` of the user folder (`%APPDATA%\Code\User` on Windows, `~/.config/Code/User` on Linux), and the installed extensions (through the `code` command) | |
+| VS Code | `settings.json`, `keybindings.json`, `snippets/` of the user folder (`%APPDATA%\Code\User` on Windows, `~/Library/Application Support/Code/User` on macOS, `~/.config/Code/User` on Linux), and the installed extensions (through the `code` command) | |
 | GitHub CLI | `config.yml` (`%APPDATA%\GitHub CLI` on Windows, `~/.config/gh` elsewhere) | |
 
 A file in the last column syncs once you ask Claude to add it, and from then on like the others. The skill advises against it for private keys (one key per machine can be revoked alone) and warns that a shared `known_hosts` conflicts each time two machines meet a new host between two syncs.
@@ -122,7 +122,7 @@ The repository doubles as the `dotfiles-sync` plugin and as its own marketplace:
 
 ## Tests
 
-[sync-test.sh](tests/sync-test.sh) runs the hook end to end: two fake home folders share a bare Git remote in a temporary folder, and the test checks the first setup, the allow-list and exclusions across the home domains, encryption on the remote, edits, additions and deletions in both directions, a private key added by hand, other chezmoi dotfiles left alone, a conflict and its resolution, a new machine that syncs before its first apply, an offline run, a failed apply retried at the next sync, project files across two paths with a fresh clone and a file the project starts tracking, the VS Code user settings, the GitHub CLI config without its token file, and a machine without chezmoi. It needs chezmoi and Git, and touches nothing outside its temporary folder:
+[sync-test.sh](tests/sync-test.sh) runs the hook end to end: two fake home folders share a bare Git remote in a temporary folder, and the test checks the first setup, the allow-list and exclusions across the home domains, encryption on the remote, edits, additions and deletions in both directions, new files over 1 MB, a file named like a glob pattern, a private key added by hand, a root renamed by hand, other chezmoi dotfiles left alone, a conflict and its resolution, a new machine that syncs before its first apply, an offline run, a remote that refuses the credentials, a sync with nothing to do that skips its apply, a failed apply retried at the next sync without bringing back a file deleted elsewhere, project files across two paths with a fresh clone and a file the project starts tracking, the VS Code user settings and extensions, the GitHub CLI config without its token file, and a machine without chezmoi. It needs chezmoi and Git, and touches nothing outside its temporary folder:
 
 ```text
 bash tests/sync-test.sh
