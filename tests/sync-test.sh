@@ -73,7 +73,7 @@ setup_config() {
 # Machine A: first setup, as the skill does it.
 mkdir -p "$SB/A"
 on A
-mkdir -p .claude/skills/foo .claude/skills/synced/x .claude/commands .claude/projects/p
+mkdir -p .claude/skills/foo .claude/skills/synced/x .claude/skills/.trash/1-2-x/old .claude/commands .claude/projects/p
 echo '{"model":"opus"}' >.claude/settings.json
 echo '# global' >.claude/CLAUDE.md
 echo 'skill' >.claude/skills/foo/SKILL.md
@@ -81,6 +81,13 @@ echo 'SECRET=1' >.claude/skills/foo/.env
 mkdir -p .claude/skills/foo/__pycache__
 echo 'bytecode' >.claude/skills/foo/__pycache__/x.pyc
 echo 'cloud' >.claude/skills/synced/x/SKILL.md
+echo 'removed' >.claude/skills/.trash/1-2-x/old/SKILL.md
+mkdir -p .claude/skills/foo/.git .claude/skills/foo/node_modules/dep .claude/skills/foo/.venv/lib
+echo 'ref: refs/heads/main' >.claude/skills/foo/.git/HEAD
+echo 'dep' >.claude/skills/foo/node_modules/dep/index.js
+echo 'venv' >.claude/skills/foo/.venv/lib/site.py
+echo 'swap' >.claude/skills/foo/.SKILL.md.swp
+echo 'backup' >.claude/skills/foo/SKILL.md~
 echo 'cmd' >.claude/commands/hi.md
 echo '{"token":1}' >.claude/.credentials.json
 echo 'history' >.claude/projects/p/session.jsonl
@@ -107,8 +114,10 @@ remote_files=$(git --git-dir="$SB/remote.git" ls-tree -r --name-only main)
 check "first sync prints nothing" '[ -z "$out" ]'
 check "allow-listed files reach the remote" \
   'grep -q settings.json <<<"$remote_files" && grep -q skills/foo/encrypted_SKILL.md <<<"$remote_files" && grep -q commands/encrypted_hi.md <<<"$remote_files"'
-check "secrets, caches, claude.ai skills, and history stay out" \
-  '! grep -Eq "\.env|credentials|pycache|synced|projects" <<<"$remote_files"'
+check "secrets, caches, claude.ai skills, removed skills, and history stay out" \
+  '! grep -Eq "\.env|credentials|pycache|synced|trash|projects" <<<"$remote_files"'
+check "Git folders, dependencies, and editor files inside a skill stay out" \
+  '! grep -Eq "dot_git/|node_modules|dot_venv|swp|~" <<<"$remote_files"'
 check "Git and SSH config reach the remote" \
   'grep -q encrypted_dot_gitconfig <<<"$remote_files" && grep -q git/encrypted_ignore <<<"$remote_files" && grep -q ssh/encrypted_config.age <<<"$remote_files" && grep -q config.d/encrypted_work <<<"$remote_files" && grep -q encrypted_id_ed25519.pub <<<"$remote_files"'
 check "private keys, known_hosts, and other dotfiles stay out" \

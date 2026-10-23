@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- `~/.claude/skills/.trash/`, and the `.git/`, `node_modules/`, `.venv/`, and editor swap or backup files inside a skill, no longer sync.
+
 ## [1.1.0] - 2026-10-22
 
 ### Added

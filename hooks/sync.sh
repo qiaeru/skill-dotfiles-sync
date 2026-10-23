@@ -93,13 +93,20 @@ excluded() {
   case "$1" in
     # claude.ai keeps this folder in sync itself.
     .claude/skills/synced | .claude/skills/synced/*) return 0 ;;
+    # Where Claude Code moves the skills it removes.
+    .claude/skills/.trash | .claude/skills/.trash/*) return 0 ;;
   esac
   case "${1##*/}" in
     .credentials.json | credentials.json | .env | .env.*) return 0 ;;
     # Caches a tool or an OS writes next to a skill's scripts.
     .DS_Store | Thumbs.db) return 0 ;;
   esac
-  case "/$1" in */__pycache__/*) return 0 ;; esac
+  case "/$1" in
+    # A skill cloned as a Git repo, or one that ships its dependencies.
+    */__pycache__/* | */.git/* | */node_modules/* | */.venv/*) return 0 ;;
+    # Editor swap and backup files.
+    *.swp | *~) return 0 ;;
+  esac
   # chezmoi add fails the whole batch on an ignored path, so the user's
   # .chezmoiignore is applied here first.
   local p

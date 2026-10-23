@@ -11,7 +11,7 @@ Refuse to add these by hand, and if the person asks, explain why it breaks or le
 - `~/.claude/plugins/`: caches and machine-absolute paths;
 - `~/.claude/projects/`: session history and per-path memory, keyed by the absolute path of each repo.
 
-`~/.claude/skills/synced/` stays out because claude.ai already keeps it in sync.
+`~/.claude/skills/synced/` stays out because claude.ai already keeps it in sync, and `~/.claude/skills/.trash/` because Claude Code moves the skills it removes there.
 
 ## Plugins
 
