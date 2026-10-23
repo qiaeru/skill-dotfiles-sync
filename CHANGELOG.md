@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A file deleted on one machine no longer comes back everywhere when the apply of that deletion fails on another: the next sync applies it instead of taking the file for a new one.
 - Deleting a file whose name holds `[`, `*`, `?`, or `{`, such as `a[1].md`, no longer blocks the sync on the other machines, or deletes files there whose names match it as a pattern.
 - A failed push after VS Code extension changes is now reported like any other push.
 

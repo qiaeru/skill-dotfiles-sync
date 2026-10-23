@@ -459,6 +459,33 @@ check "a failed apply says so" 'grep -q "could not apply" <<<"$out" && ! grep -q
 sync >/dev/null
 check "a failed apply is retried at the next sync" 'grep -q 16 "$(vscode)/settings.json"'
 
+# The same for the home: a deletion leaves the status clean once pulled, so
+# only the pending list brings it at the next sync.
+mkdir -p "$SB/failhome"
+cat >"$SB/failhome/chezmoi" <<EOF
+#!/usr/bin/env bash
+case " \$* " in " apply "*) exit 1 ;; esac
+exec "$(command -v chezmoi)" "\$@"
+EOF
+chmod +x "$SB/failhome/chezmoi"
+on A
+echo 'retry' >.claude/commands/retry.md
+sync >/dev/null
+on B
+sync >/dev/null
+on A
+rm .claude/commands/retry.md
+sync >/dev/null
+on B
+out=$(PATH="$SB/failhome:$PATH" sync)
+check "a failed home apply says so" 'grep -q "could not apply" <<<"$out" && [ -f .claude/commands/retry.md ]'
+sync >/dev/null
+check "a failed home apply is retried at the next sync" '[ ! -e .claude/commands/retry.md ]'
+on A
+sync >/dev/null
+check "a deletion survives a failed apply elsewhere" '[ ! -e .claude/commands/retry.md ]'
+on B
+
 # A push the remote refuses for lack of credentials is not called offline.
 cat >"$SB/failing/git" <<EOF
 #!/usr/bin/env bash

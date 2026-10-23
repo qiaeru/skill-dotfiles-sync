@@ -68,6 +68,8 @@ trap finish EXIT
 # Whether $2, a list of lines, holds the line $1. A bash test rather than a
 # grep, since each process costs tens of milliseconds in Git Bash.
 has_line() { [[ $'\n'$2$'\n' == *$'\n'"$1"$'\n'* ]]; }
+# Reads the file $1, if any, into the variable named $2.
+read_file() { [ -f "$1" ] && IFS= read -r -d '' "$2" <"$1"; return 0; }
 
 in_scope() {
   local r
@@ -295,10 +297,25 @@ fi
 # New files. Encrypted like the rest, so the remote only ever holds ciphertext.
 added=()
 candidate() {
-  [ -f "$1" ] && [ ! -L "$1" ] && ! excluded "$1" && ! is_managed "$1" && added+=("$1")
+  [ -f "$1" ] && [ ! -L "$1" ] && ! excluded "$1" && ! is_managed "$1" && ! pending_removal "$1" && added+=("$1")
 }
-# A file deleted earlier and created again must leave the removal list, or
-# the next apply deletes it.
+# A file whose pulled removal was never applied here, as when that apply
+# failed, is still on disk and no longer managed: taken for new, it would
+# come back on every machine. Its entry in the state is still the file
+# chezmoi wrote, while a file created again after the removal has a remove
+# entry, or none once forgotten. Reads $rm_lines (the removal list) and
+# $rm_dest, and sets $rm_hit so the apply runs.
+pending_removal() {
+  [ -n "$rm_lines" ] || return 1
+  escape_globs "$1"
+  has_line "${escaped[0]}" "${rm_lines//$'\r'/}" || return 1
+  local key="\"$rm_dest/$1\": {" e
+  [[ $written == *"$key"* ]] || return 1
+  e=${written#*"$key"}
+  e=${e%%\}*}
+  [[ $e == *'"type": "file"'* ]] || return 1
+  rm_hit=1
+}
 # age ciphertext does not delta-compress, so each edit of a large file stores
 # a full copy in the repo. A new file over 1 MB is left out of $added and
 # named once per machine; added by hand, it then syncs like the rest. $1
@@ -323,12 +340,18 @@ drop_large() {
   [ ${#new[@]} -gt 0 ] && say "left out ${#new[@]} new file(s) over 1 MB, such as ${new[0]}; ask Claude to add one by hand to sync it anyway"
   return 0
 }
+# A file deleted earlier and created again must leave the removal list, or
+# the next apply deletes it.
 unremove() {
   [ -f "$1" ] || return 0
   escape_globs "${added[@]}"
   grep -Fxv -f <(printf '%s\n' "${escaped[@]}") "$1" >"$1.tmp"
   mv "$1.tmp" "$1"
 }
+rm_lines=
+read_file "$src/.chezmoiremove" rm_lines
+rm_dest=$home_abs
+rm_hit=
 for f in "${FILES[@]}"; do candidate "$f"; done
 # CLAUDE.md and the files it imports, and the script the status line runs.
 for f in .claude/*.md .claude/statusline*; do candidate "$f"; done
@@ -479,7 +502,6 @@ minus() {
   printf '%s' "$out"
 }
 sorted() { printf '%s\n' "$@" | grep -v '^$' | LC_ALL=C sort -u; }
-read_file() { [ -f "$1" ] && IFS= read -r -d '' "$2" <"$1"; return 0; }
 
 # Each listing starts VS Code's CLI, about a second, so it runs only when
 # something may have changed.
@@ -656,6 +678,10 @@ capture_tree() {
     fi
   fi
   added=()
+  rm_lines=
+  read_file "$tsrc/.chezmoiremove" rm_lines
+  rm_dest=$tabs
+  rm_hit=
   if [ -n "$mark" ]; then
     for path in ${paths[@]+"${paths[@]}"}; do candidate "$path"; done
   elif [ "${tsrc##*/}" = gh ]; then
@@ -667,6 +693,7 @@ capture_tree() {
       while IFS= read -r path; do candidate "$path"; done < <(find snippets -type f)
     fi
   fi
+  [ -n "$rm_hit" ] && rm_trees+=${tsrc#"$src"/}$'\n'
   drop_large "$tdest/"
   if [ ${#added[@]} -gt 0 ]; then
     mkdir -p "$tsrc"
@@ -677,6 +704,7 @@ capture_tree() {
 }
 
 ext_pre
+rm_trees=
 for ((i = 0; i < ${#tree_src[@]}; i++)); do
   tsrc=${tree_src[$i]} tdest=${tree_dest[$i]} mark=${tree_mark[$i]} tabs=${tree_abs[$i]}
   if ! capture_tree; then
@@ -765,7 +793,8 @@ for ((i = 0; i < ${#tree_src[@]}; i++)); do
   tsrc=${tree_src[$i]} tdest=${tree_dest[$i]} mark=${tree_mark[$i]}
   [ -d "$tsrc" ] || continue
   rel=${tsrc#"$src"/}
-  if { [ -n "$mark" ] && [ ! -e "$mark" ]; } || [[ $pulled_src == *$'\n'"$rel/"* ]] || has_line "$rel" "$pending"; then
+  if { [ -n "$mark" ] && [ ! -e "$mark" ]; } || [[ $pulled_src == *$'\n'"$rel/"* ]] ||
+    has_line "$rel" "$pending" || has_line "$rel" "$rm_trees"; then
     n=$(cz status --include=files,remove 2>/dev/null | wc -l)
     cz apply --force --no-tty || {
       say "could not apply the pulled files to $tdest; run 'chezmoi apply -v' there to see why"
