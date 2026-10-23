@@ -162,16 +162,18 @@ abs() {
 }
 
 # chezmoi reads the lines of .chezmoiremove and .chezmoiignore as globs, so a
-# path holding * ? [ { would also match other files there. Sets $escaped.
+# path holding * ? [ { would also match other files there. A class escapes
+# [ * ? on every OS, while a backslash is a separator on Windows. A brace has
+# no escape there (chezmoi expands braces before classes), so it becomes ?,
+# which only matches a name that differs in that character. Sets $escaped.
 escape_globs() {
-  local p b=\\
+  local p
   escaped=()
   for p in "$@"; do
-    p=${p//\\/"$b$b"}
-    p=${p//\*/"$b*"}
-    p=${p//\?/"$b?"}
-    p=${p//\[/"${b}["}
-    p=${p//\{/"$b{"}
+    p=${p//\[/[[]}
+    p=${p//\*/[*]}
+    p=${p//\?/[?]}
+    p=${p//[\\\{\}]/?}
     escaped+=("$p")
   done
 }

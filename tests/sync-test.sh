@@ -238,18 +238,18 @@ echo 'cmd again' >.claude/commands/hi.md
 sync >/dev/null
 check "a file created again leaves the removal list" '! grep -qx .claude/commands/hi.md "$(src)/.chezmoiremove"'
 
-# chezmoi reads .chezmoiremove lines as globs: a[1].md must not take a1.md.
-echo 'x' >'.claude/commands/a[1].md'
-echo 'x' >.claude/commands/a1.md
+# chezmoi reads .chezmoiremove lines as globs: a[1].md must not take a1.md,
+# nor b{2}.md take b2.md. Both names are valid on Windows too.
+for f in 'a[1].md' a1.md 'b{2}.md' b2.md; do echo 'x' >".claude/commands/$f"; done
 sync >/dev/null
 on B
 sync >/dev/null
-rm '.claude/commands/a[1].md'
+rm '.claude/commands/a[1].md' '.claude/commands/b{2}.md'
 sync >/dev/null
 on A
 out=$(sync)
 check "a deleted file named like a glob removes no other file" \
-  '! grep -q "could not apply" <<<"$out" && [ ! -e ".claude/commands/a[1].md" ] && [ -f .claude/commands/a1.md ]'
+  '! grep -q "could not apply" <<<"$out" && [ ! -e ".claude/commands/a[1].md" ] && [ ! -e ".claude/commands/b{2}.md" ] && [ -f .claude/commands/a1.md ] && [ -f .claude/commands/b2.md ]'
 
 printf '.claude/skills/private\n.config/git/attributes\n' >"$(src)/.chezmoiignore"
 mkdir -p .claude/skills/private .claude/skills/public
