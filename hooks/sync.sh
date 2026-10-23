@@ -494,7 +494,9 @@ ext_pre() {
   # DOTFILES_SYNC_HOST tells apart two machines that share a hostname.
   ext_host=${DOTFILES_SYNC_HOST:-$(hostname)}
   ext_host=${ext_host//[^A-Za-z0-9._-]/_}
-  [ -f "$ext_cache/own" ] && [ ! "$ext_json" -nt "$ext_cache/own" ] && return 0
+  # Skipped only when the cache is strictly newer: bash 3.2 compares whole
+  # seconds, and an install in the second of the last listing must be seen.
+  [ "$ext_cache/own" -nt "$ext_json" ] && return 0
   ext_list || return 0
   ext_publish
 }
@@ -511,7 +513,7 @@ ext_post() {
     h=${h%.age}
     [ "$h" = "$ext_host" ] && continue
     # A pull rewrites the file only when that machine's list changed.
-    [ -f "$ext_cache/seen-$h" ] && [ ! "$f" -nt "$ext_cache/seen-$h" ] && continue
+    [ "$ext_cache/seen-$h" -nt "$f" ] && continue
     list=$(chezmoi decrypt "$f" 2>/dev/null) || continue
     list=$(sorted "${list//$'\r'/}")
     set=$(installed_of "$list")
