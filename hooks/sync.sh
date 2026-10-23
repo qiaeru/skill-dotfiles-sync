@@ -133,6 +133,27 @@ source_roots() {
   done
 }
 
+# The target of a source path, in $target, enough to tell whether it falls
+# under ROOTS: the attribute prefixes chezmoi puts in front of each name are
+# dropped. Sets a variable rather than printing, to spare a subshell.
+target_of() {
+  local parts part
+  target=
+  IFS=/ read -r -a parts <<<"$1"
+  for part in "${parts[@]}"; do
+    while :; do
+      case "$part" in
+        after_* | before_* | create_* | empty_* | encrypted_* | exact_* | executable_* | \
+          external_* | modify_* | once_* | onchange_* | private_* | readonly_* | \
+          remove_* | run_* | symlink_*) part=${part#*_} ;;
+        *) break ;;
+      esac
+    done
+    case "$part" in dot_*) part=.${part#dot_} ;; literal_*) part=${part#literal_} ;; esac
+    target+=${target:+/}${part%.age}
+  done
+}
+
 # chezmoi keys its persistent state by absolute path, in its own form.
 abs() {
   if command -v cygpath >/dev/null 2>&1; then cygpath -m "$@"; else printf '%s\n' "$@"; fi
@@ -257,7 +278,23 @@ if [ ${#added[@]} -gt 0 ]; then
 fi
 # The roots as they are after the capture, a root just created included. The
 # trees below reuse $managed, so this cannot wait for the commit.
-sources+=$'\n'$(source_roots)
+now=$(source_roots)
+# chezmoi on Windows records no mode, so a root it creates there would land
+# as 755 on the other machines, while these two hold keys and tokens.
+private=()
+while IFS= read -r p; do
+  case "${p##*/}" in
+    *private_*) ;;
+    *dot_ssh) private+=(.ssh) ;;
+    *dot_claude) private+=(.claude) ;;
+  esac
+done <<<"$now"
+if [ ${#private[@]} -gt 0 ]; then
+  chezmoi chattr --no-tty +private "${private[@]}" || say "could not make ${private[*]} private in the source repo"
+  sources+=$'\n'$now
+  now=$(source_roots)
+fi
+sources+=$'\n'$now
 
 # Trees: each project, the VS Code user folder, and the GitHub CLI folder is
 # its own chezmoi source under .dotfiles-sync, applied to a destination that
@@ -424,6 +461,13 @@ while IFS= read -r p; do
   p=${p#"$src"/}
   [ -e "$src/$p" ] || git -C "$src" ls-files --error-unmatch "$p" >/dev/null 2>&1 && tracked+=("$p")
 done < <(printf '%s\n' "$sources" .chezmoiremove .chezmoiignore .dotfiles-sync | sort -u)
+# A root renamed by hand (chezmoi chattr) before this run leaves its old path
+# deleted, which no pathspec above names, and the pull refuses a tree with an
+# unstaged deletion.
+while IFS= read -r -d '' p; do
+  target_of "$p"
+  in_scope "$target" && tracked+=("$p")
+done < <(git -C "$src" ls-files --deleted -z)
 [ ${#tracked[@]} -gt 0 ] && git -C "$src" add -A -- "${tracked[@]}"
 if ! git -C "$src" diff --cached --quiet; then
   git -C "$src" commit -q -m "sync: $(hostname)" || {

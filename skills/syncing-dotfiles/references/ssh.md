@@ -4,6 +4,8 @@ The hook syncs `~/.ssh/config`, every file under `~/.ssh/config.d/`, and the pub
 
 A `config.d/` folder is a convention, not an SSH default. It only works with `Include config.d/*` at the top of `~/.ssh/config`.
 
+`~/.ssh` must stay closed to other users, or SSH refuses the keys inside. The hook marks the `.ssh` and `.claude` source folders `private_`, so chezmoi writes them as 700 on Linux and macOS whatever OS added them first.
+
 ## Private keys
 
 First, advise against syncing them. One key per machine is the safer default: a lost laptop means revoking one key on GitHub and the servers, not every key the person owns. A synced private key is as safe as the age key: whoever holds `key.txt` and the repo holds the SSH key too.

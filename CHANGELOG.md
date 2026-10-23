@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- `~/.ssh` and `~/.claude` no longer land as 755 folders on Linux and macOS when the first machine runs Windows.
 - `~/.claude/skills/.trash/`, and the `.git/`, `node_modules/`, `.venv/`, and editor swap or backup files inside a skill, no longer sync.
+- A root renamed in the source repo, for example by `chezmoi chattr`, no longer blocks every following sync.
 
 ## [1.1.0] - 2026-10-22
 

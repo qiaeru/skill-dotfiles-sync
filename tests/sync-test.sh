@@ -118,6 +118,8 @@ check "secrets, caches, claude.ai skills, removed skills, and history stay out" 
   '! grep -Eq "\.env|credentials|pycache|synced|trash|projects" <<<"$remote_files"'
 check "Git folders, dependencies, and editor files inside a skill stay out" \
   '! grep -Eq "dot_git/|node_modules|dot_venv|swp|~" <<<"$remote_files"'
+check "the .ssh and .claude roots sync as private" \
+  '! grep -Eq "^dot_(ssh|claude)/" <<<"$remote_files" && grep -q "^private_dot_ssh/" <<<"$remote_files" && grep -q "^private_dot_claude/" <<<"$remote_files"'
 check "Git and SSH config reach the remote" \
   'grep -q encrypted_dot_gitconfig <<<"$remote_files" && grep -q git/encrypted_ignore <<<"$remote_files" && grep -q ssh/encrypted_config.age <<<"$remote_files" && grep -q config.d/encrypted_work <<<"$remote_files" && grep -q encrypted_id_ed25519.pub <<<"$remote_files"'
 check "private keys, known_hosts, and other dotfiles stay out" \
@@ -160,6 +162,14 @@ echo 'export A=2' >.bashrc
 sync >/dev/null
 check "other dotfiles in the chezmoi repo are left alone" \
   '[ "$(cat .bashrc)" = "export A=2" ] && [ -n "$(git -C "$(src)" status --porcelain -- dot_bashrc)" ]'
+
+# A root renamed by hand leaves its old path deleted; the sync stages it.
+# re-add derives the mode from the disk, hence the chmod.
+chmod 600 .gitconfig
+chezmoi chattr +private .gitconfig
+out=$(sync)
+check "a root renamed by hand syncs" \
+  '[ -z "$out" ] && [ -z "$(git -C "$(src)" status --porcelain -- "*gitconfig*")" ] && ! git --git-dir="$SB/remote.git" ls-tree -r --name-only main | grep -q "^encrypted_dot_gitconfig"'
 on B
 sync >/dev/null
 check "a private key added by hand reaches the other machine" '[ "$(cat .ssh/id_ed25519)" = "PRIVATE KEY" ]'
@@ -227,7 +237,7 @@ sync >/dev/null
 check "a file never applied here is fetched, not deleted" \
   '[ -f .claude/skills/from-a/SKILL.md ] && git --git-dir="$SB/remote.git" ls-tree -r --name-only main | grep -q from-a'
 check "a local file never applied here wins" \
-  'git --git-dir="$SB/remote.git" show main:dot_claude/encrypted_settings.json.age | chezmoi decrypt | grep -q D'
+  'git --git-dir="$SB/remote.git" show main:private_dot_claude/encrypted_settings.json.age | chezmoi decrypt | grep -q D'
 on A
 
 # Offline: changes wait in a local commit and leave on the next sync.
@@ -238,7 +248,7 @@ check "an offline sync says so" 'grep -q offline <<<"$out"'
 mv "$SB/remote.off" "$SB/remote.git"
 sync >/dev/null
 check "the offline edit goes out once back online" \
-  'git --git-dir="$SB/remote.git" show main:dot_claude/encrypted_CLAUDE.md.age | chezmoi decrypt | grep -q "offline edit"'
+  'git --git-dir="$SB/remote.git" show main:private_dot_claude/encrypted_CLAUDE.md.age | chezmoi decrypt | grep -q "offline edit"'
 
 # Projects: A and B clone the same repo at different paths, and the files its
 # Git does not track travel through the dotfiles repo, as do the VS Code user

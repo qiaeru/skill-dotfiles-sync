@@ -108,7 +108,7 @@ Once the repo is cloned, the next sync settles every file that exists both here 
    ```
 
    The folders per OS are in [references/vscode.md](references/vscode.md) and [references/github-cli.md](references/github-cli.md); run the last line for each project already cloned here. For each existing local file that differs, ask which version wins. Back up the local ones first (for example `cp -r ~/.claude ~/.claude.bak-$(date +%F)`, and the same for `~/.ssh` and `~/.gitconfig`) and say where the copies are. A `~/.gitconfig` that differs only by machine-specific values is the case [references/git.md](references/git.md) solves.
-5. Apply the repo versions: `chezmoi apply <root>`, or `chezmoi apply <path>` file by file when some local versions should win. For a tree, put the same `--source` and `--destination` before `apply`. A file left out keeps its local version, and the sync sends it to the other machines.
+5. Check that `chezmoi source-path ~/.ssh ~/.claude` names `private_` folders. A repo whose first machine ran Windows under an earlier version of the hook may hold plain `dot_ssh` and `dot_claude`, which an apply turns into 755 folders here; run `chezmoi chattr +private ~/.ssh ~/.claude` first in that case (the next sync commits the rename). Then apply the repo versions: `chezmoi apply <root>`, or `chezmoi apply <path>` file by file when some local versions should win. For a tree, put the same `--source` and `--destination` before `apply`. A file left out keeps its local version, and the sync sends it to the other machines.
 6. Lift the hold and sync: `rm "$src/.git/dotfiles-sync.hold"`, then `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh"`. Files present only on this machine are added to the repo at that point.
 
 ## Conflict
