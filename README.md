@@ -26,7 +26,7 @@ The hook reaches four places in your home folder (`~/.claude`, `~/.gitconfig`, `
 
 | Domain | Synced | Never synced unless you ask |
 | --- | --- | --- |
-| Claude Code | `settings.json`, `keybindings.json`, `CLAUDE.md`, and the `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, `themes/` folders | |
+| Claude Code | `settings.json`, `keybindings.json`, every `*.md` at the top of `~/.claude` (`CLAUDE.md` and the files it imports), the `statusline*` script, and the `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, `themes/` folders | |
 | Git | `~/.gitconfig`, `~/.config/git/config`, `~/.config/git/ignore`, `~/.config/git/attributes` | |
 | SSH | `~/.ssh/config`, `~/.ssh/config.d/`, public keys (`*.pub`) | private keys, `known_hosts`, `authorized_keys` |
 | Projects | files the project's Git does not track, at any depth: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/settings.json` and `settings.local.json`, the `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/` folders, and the `settings`, `launch`, `tasks`, `extensions` JSON files and `*.code-snippets` of `.vscode/` | |

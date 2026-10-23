@@ -130,6 +130,14 @@ commits=$(git -C "$(src)" rev-list --count HEAD)
 sync >/dev/null
 check "an idle sync makes no commit" '[ "$(git -C "$(src)" rev-list --count HEAD)" = "$commits" ]'
 
+# The files CLAUDE.md imports and the status line script travel.
+echo '# style' >.claude/style.md
+echo 'echo ok' >.claude/statusline-command.sh
+out=$(sync)
+remote_files=$(git --git-dir="$SB/remote.git" ls-tree -r --name-only main)
+check "the files CLAUDE.md imports and the status line script reach the remote" \
+  'grep -q "^private_dot_claude/encrypted_style.md.age$" <<<"$remote_files" && grep -q statusline-command <<<"$remote_files"'
+
 # Machine B: joins with chezmoi init --apply, then edits, adds, deletes.
 mkdir -p "$SB/B"
 on B

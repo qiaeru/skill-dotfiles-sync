@@ -1,6 +1,6 @@
 # Claude Code: ~/.claude
 
-The hook syncs the global Claude Code config: `settings.json`, `keybindings.json`, and `CLAUDE.md` at the top of `~/.claude`, and every file under `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, and `themes/`. A file anywhere else in `~/.claude` is ignored, so a new sensitive file Claude Code adds later is missed rather than leaked.
+The hook syncs the global Claude Code config: `settings.json`, `keybindings.json`, every `*.md` at the top of `~/.claude` (`CLAUDE.md` and the files it imports with `@~/.claude/<file>.md`), the status line script (`statusline*`, such as `statusline-command.sh`), and every file under `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, and `themes/`. A file anywhere else in `~/.claude` is ignored, so a new sensitive file Claude Code adds later is missed rather than leaked.
 
 ## Never sync
 

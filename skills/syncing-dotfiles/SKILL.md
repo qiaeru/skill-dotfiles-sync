@@ -24,7 +24,7 @@ The hook reaches four roots in the home folder (`.claude`, `.gitconfig`, `.confi
 
 | Domain | Picked up automatically |
 | --- | --- |
-| Claude Code | `settings.json`, `keybindings.json`, `CLAUDE.md`, and every file under `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, `themes/` |
+| Claude Code | `settings.json`, `keybindings.json`, every `*.md` at the top of `~/.claude` (`CLAUDE.md` and the files it imports), `statusline*` (the status line script), and every file under `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, `themes/` |
 | Git | `~/.gitconfig`, `~/.config/git/config`, `~/.config/git/ignore`, `~/.config/git/attributes` |
 | SSH | `~/.ssh/config`, every file under `~/.ssh/config.d/`, `~/.ssh/*.pub` |
 | Projects | at any depth and only when the project's Git does not track them: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/settings.json`, `.claude/settings.local.json`, every file under `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, and `.vscode/` `settings.json`, `launch.json`, `tasks.json`, `extensions.json`, `*.code-snippets`; never under `node_modules/` |

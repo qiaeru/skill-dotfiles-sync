@@ -16,7 +16,7 @@ ROOTS=(.claude .gitconfig .config/git .ssh)
 
 # New files are picked up only from this allow-list, so a new file elsewhere
 # (a private key, a token a future tool writes) is missed, never leaked.
-FILES=(.claude/settings.json .claude/keybindings.json .claude/CLAUDE.md
+FILES=(.claude/settings.json .claude/keybindings.json
   .gitconfig .config/git/config .config/git/ignore .config/git/attributes
   .ssh/config)
 DIRS=(.claude/skills .claude/agents .claude/commands .claude/hooks
@@ -281,6 +281,8 @@ unremove() {
   mv "$1.tmp" "$1"
 }
 for f in "${FILES[@]}"; do candidate "$f"; done
+# CLAUDE.md and the files it imports, and the script the status line runs.
+for f in .claude/*.md .claude/statusline*; do candidate "$f"; done
 # Public keys only: a private key syncs once added by hand.
 for f in .ssh/*.pub; do candidate "$f"; done
 for d in "${DIRS[@]}"; do

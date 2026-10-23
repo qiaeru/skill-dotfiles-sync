@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- The Markdown files at the top of `~/.claude`, such as the ones `CLAUDE.md` imports, and the status line script now sync.
 - The skill covers settings and scripts that only work on one OS: absolute paths in `settings.json`, scripts added on Windows without the executable bit, and macOS-only SSH options such as `UseKeychain`.
 
 ### Fixed
