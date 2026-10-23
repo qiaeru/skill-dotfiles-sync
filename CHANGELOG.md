@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- Changes pulled into the source repo outside the hook, by `chezmoi update`, a hand `git pull`, or a sync cut short after its pull, are now applied at the next sync. Before, a project or the home folder could stay behind until another machine changed the same files.
+
 ## [1.3.0] - 2026-10-23
 
 ### Added

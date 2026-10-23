@@ -729,6 +729,15 @@ for ((i = 0; i < ${#tree_src[@]}; i++)); do
 done
 cd "$HOME" || exit 0
 
+# The commit every apply had reached at the end of the last full run. A HEAD
+# that moved since then was pulled outside the hook (chezmoi update, a hand
+# pull, a run cut by the timeout), and what that pull brought was never
+# applied here.
+applied_file="$src/.git/dotfiles-sync.applied"
+applied=
+[ -f "$applied_file" ] && IFS= read -r applied <"$applied_file"
+pre=$(git -C "$src" rev-parse HEAD 2>/dev/null)
+
 # The roots as they were before the capture and as they are now, so a root
 # emptied by deletions and a root just created are both staged. git add
 # rejects a pathspec that matches nothing, which .chezmoiremove is until the
@@ -755,6 +764,16 @@ if ! git -C "$src" diff --cached --quiet; then
 fi
 
 before=$(git -C "$src" rev-parse HEAD 2>/dev/null)
+if [ -n "$pre" ] && [ "$applied" != "$pre" ]; then
+  # Without a marker (a machine that ran an older hook), every path counts as
+  # pulled once: the capture above already saved the local changes, so the
+  # apply only brings what the source holds.
+  if [ -n "$applied" ] && git -C "$src" cat-file -e "$applied^{commit}" 2>/dev/null; then
+    before=$applied
+  else
+    before=$(git -C "$src" hash-object -t tree /dev/null)
+  fi
+fi
 if ! err=$(LC_ALL=C git -C "$src" pull -q --rebase 2>&1 >/dev/null); then
   if [ -d "$src/.git/rebase-merge" ] || [ -d "$src/.git/rebase-apply" ]; then
     git -C "$src" rebase --abort 2>/dev/null
@@ -850,4 +869,6 @@ if [ -n "$(git -C "$src" log --format=%H '@{u}..HEAD' 2>/dev/null)" ]; then
   fi
 fi
 ext_post
+# A tree whose apply failed is in the pending list, so the marker moves on.
+git -C "$src" rev-parse HEAD >"$applied_file" 2>/dev/null
 exit 0

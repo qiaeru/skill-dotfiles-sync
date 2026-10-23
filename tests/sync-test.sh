@@ -381,13 +381,26 @@ on B
 sync >/dev/null
 check "an edit after an idle sync propagates" '[ "$(cat src/proj/CLAUDE.md)" = "edited again on A" ]'
 
+# A pull made outside the hook (chezmoi update, a hand pull, a run cut after
+# its pull) leaves the next pull with nothing new; the changes it brought must
+# still be applied, to the trees and to the home.
+on A
+echo 'pulled by hand' >code/proj/CLAUDE.md
+echo 'hand' >.claude/commands/hand.md
+sync >/dev/null
+on B
+git -C "$(src)" pull -q --rebase
+sync >/dev/null
+check "changes pulled outside the hook are applied at the next sync" \
+  '[ "$(cat src/proj/CLAUDE.md)" = "pulled by hand" ] && [ -f .claude/commands/hand.md ]'
+
 # A fresh clone at a path that held an older one is not a deletion.
 on B
 rm -rf src/proj
 git clone -q "$SB/A/code/proj" src/proj
 sync >/dev/null
 check "a fresh clone gets its files back and deletes nothing" \
-  '[ "$(cat src/proj/CLAUDE.md)" = "edited again on A" ] && git --git-dir="$SB/remote.git" ls-tree -r --name-only main | grep -q "^$p/encrypted_CLAUDE.md.age$"'
+  '[ "$(cat src/proj/CLAUDE.md)" = "pulled by hand" ] && git --git-dir="$SB/remote.git" ls-tree -r --name-only main | grep -q "^$p/encrypted_CLAUDE.md.age$"'
 
 # A file the project starts tracking leaves the sync, not the disks.
 on A

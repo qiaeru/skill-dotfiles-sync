@@ -136,6 +136,7 @@ The hook reports "the same file changed on two machines" when both sides edited 
 
 ## Other situations
 
+- To sync by hand, run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/sync.sh"`. Never suggest `chezmoi update` or a bare `chezmoi apply`: they apply over local edits the hook has not captured yet, and skip the projects, VS Code, and gh.
 - To pause the sync, run `/plugin disable dotfiles-sync`; the files stay where they are.
 - A lost key leaves the repo unreadable, but every machine still holds its files in clear. Generate a new key on one machine and update `chezmoi.toml`. In the source repo, delete the source paths of the four home roots (`chezmoi source-path <root>` gives each), every `*.age` file under `.dotfiles-sync/` (keep its `.chezmoiignore` files), and `.chezmoiremove`, then commit and run a sync: everything the allow-lists cover is added again under the new key. Files added by hand, such as a private key, must be added again too. Then reinstall the key on the other machines.
 - For a leaked key, take the same steps, then rotate every secret a synced file holds, synced SSH private keys first.
