@@ -163,6 +163,13 @@ sync >/dev/null
 check "other dotfiles in the chezmoi repo are left alone" \
   '[ "$(cat .bashrc)" = "export A=2" ] && [ -n "$(git -C "$(src)" status --porcelain -- dot_bashrc)" ]'
 
+# A hand edit in the source repo blocks the pull, and the hook says why.
+echo '# hand edit' >>"$(src)/.gitattributes"
+out=$(sync)
+check "an uncommitted change in the source repo is named, not taken for offline" \
+  'grep -q "uncommitted changes" <<<"$out" && ! grep -q offline <<<"$out"'
+git -C "$(src)" checkout -q -- .gitattributes
+
 # A root renamed by hand leaves its old path deleted; the sync stages it.
 # re-add derives the mode from the disk, hence the chmod.
 chmod 600 .gitconfig
@@ -358,6 +365,19 @@ out=$(PATH="$SB/failing:$PATH" sync)
 check "a failed apply says so" 'grep -q "could not apply" <<<"$out" && ! grep -q 16 "$(vscode)/settings.json"'
 sync >/dev/null
 check "a failed apply is retried at the next sync" 'grep -q 16 "$(vscode)/settings.json"'
+
+# A push the remote refuses for lack of credentials is not called offline.
+cat >"$SB/failing/git" <<EOF
+#!/usr/bin/env bash
+case " \$* " in *" push "*) echo 'fatal: Authentication failed for remote' >&2; exit 128 ;; esac
+exec "$(command -v git)" "\$@"
+EOF
+chmod +x "$SB/failing/git"
+echo '{"editor.fontSize":18}' >"$(vscode)/settings.json"
+out=$(PATH="$SB/failing:$PATH" sync)
+check "an authentication failure is named, not taken for offline" \
+  'grep -q "could not log in" <<<"$out" && ! grep -q offline <<<"$out"'
+sync >/dev/null
 
 # A * in a tree's .chezmoiignore leaves that tree out, here VS Code.
 echo '*' >"$(src)/.dotfiles-sync/vscode/.chezmoiignore"

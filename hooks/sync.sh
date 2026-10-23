@@ -188,7 +188,29 @@ classify() {
   done <<<"$status"
 }
 
-command -v chezmoi >/dev/null 2>&1 || exit 0
+# A remote failure, read from git's stderr (run with LC_ALL=C, since the
+# messages are translated): a credential the hook cannot ask for is not a
+# network outage, and the fix differs.
+remote_failed() {
+  case "$2" in
+    *"Authentication failed"* | *"could not read Username"* | *"terminal prompts disabled"* | \
+      *"Permission denied"* | *"Host key verification failed"*)
+      say "$1 failed: Git could not log in to the remote without a prompt; check its credential helper or SSH key" ;;
+    *) say "$1 failed (offline?); $3" ;;
+  esac
+}
+
+# An app launched from the macOS Dock or some Linux desktops gets a minimal
+# PATH, without the folders chezmoi, git, and gh are often installed in.
+for d in "$HOME/.local/bin" "$HOME/bin" /opt/homebrew/bin /usr/local/bin; do
+  case ":$PATH:" in *":$d:"*) ;; *) [ -d "$d" ] && PATH=$PATH:$d ;; esac
+done
+if ! command -v chezmoi >/dev/null 2>&1; then
+  # Without chezmoi there is no source to ask for, so the default one stands in.
+  [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/chezmoi/.git" ] &&
+    say "chezmoi is not on the PATH this session got, so nothing synced; install it or add its folder to PATH"
+  exit 0
+fi
 src=$(chezmoi source-path 2>/dev/null) || exit 0
 git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 cd "$HOME" || exit 0
@@ -477,12 +499,16 @@ if ! git -C "$src" diff --cached --quiet; then
 fi
 
 before=$(git -C "$src" rev-parse HEAD 2>/dev/null)
-if ! git -C "$src" pull -q --rebase 2>/dev/null; then
+if ! err=$(LC_ALL=C git -C "$src" pull -q --rebase 2>&1 >/dev/null); then
   if [ -d "$src/.git/rebase-merge" ] || [ -d "$src/.git/rebase-apply" ]; then
     git -C "$src" rebase --abort 2>/dev/null
     say "the same file changed on two machines; ask Claude to resolve the dotfiles-sync conflict"
+  elif ! git -C "$src" diff --quiet 2>/dev/null || ! git -C "$src" diff --cached --quiet 2>/dev/null; then
+    # git refuses to rebase over changes the sync does not own, such as a
+    # hand edit in the source repo or another dotfile.
+    say "pull refused: the source repo has uncommitted changes the sync does not own; commit or discard them in $src"
   else
-    say "pull failed (offline?); local changes are committed and will go out next time"
+    remote_failed pull "$err" "local changes are committed and will go out next time"
   fi
   exit 0
 fi
@@ -545,6 +571,6 @@ done
 [ "$pulled" -gt 0 ] && say "updated $((pulled)) file(s) from another machine"
 
 if [ -n "$(git -C "$src" log --format=%H '@{u}..HEAD' 2>/dev/null)" ]; then
-  git -C "$src" push -q 2>/dev/null || say "push failed (offline?); will retry next session"
+  err=$(LC_ALL=C git -C "$src" push -q 2>&1 >/dev/null) || remote_failed push "$err" "will retry next session"
 fi
 exit 0

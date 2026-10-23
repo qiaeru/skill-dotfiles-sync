@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `~/.ssh` and `~/.claude` no longer land as 755 folders on Linux and macOS when the first machine runs Windows.
 - `~/.claude/skills/.trash/`, and the `.git/`, `node_modules/`, `.venv/`, and editor swap or backup files inside a skill, no longer sync.
 - A root renamed in the source repo, for example by `chezmoi chattr`, no longer blocks every following sync.
+- The hook finds chezmoi when Claude Code starts with a minimal PATH, as an app launched from the macOS Dock does, and says so when it still cannot.
+- A failed pull or push names its cause: uncommitted changes in the source repo, or a credential Git cannot ask for, instead of "offline?".
 
 ## [1.1.0] - 2026-10-22
 
