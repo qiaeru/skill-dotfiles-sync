@@ -418,6 +418,146 @@ fi
 
 cz() { chezmoi --source "$tsrc" --destination "$tdest" "$@"; }
 
+# VS Code extensions. Each machine publishes the list it has installed to a
+# file of its own and never writes another machine's, so two machines cannot
+# conflict on it. What another machine added or removed since this one last
+# read its list is applied here; a machine read for the first time only adds.
+ext_dir=.dotfiles-sync/vscode-extensions
+ext_cache="$src/.git/dotfiles-sync-extensions"
+ext_json=$HOME/.vscode/extensions/extensions.json
+if [ -n "${VSCODE_EXTENSIONS:-}" ]; then
+  ext_json=$VSCODE_EXTENSIONS/extensions.json
+  command -v cygpath >/dev/null 2>&1 && ext_json=$(cygpath -u "$ext_json")
+fi
+ext_on=
+ext_host=
+ext_cur=
+ext_listed=
+
+# The lines of $1 missing from $2.
+minus() {
+  local l out=''
+  while IFS= read -r l; do
+    [ -n "$l" ] && ! has_line "$l" "$2" && out+=$l$'\n'
+  done <<<"$1"
+  printf '%s' "$out"
+}
+sorted() { printf '%s\n' "$@" | grep -v '^$' | LC_ALL=C sort -u; }
+read_file() { [ -f "$1" ] && IFS= read -r -d '' "$2" <"$1"; return 0; }
+
+# Each listing starts VS Code's CLI, about a second, so it runs only when
+# something may have changed.
+ext_list() {
+  [ -n "$ext_listed" ] && return 0
+  ext_cur=$(code --list-extensions 2>/dev/null | tr -d '\r' | LC_ALL=C sort -u) || return 1
+  ext_listed=1
+}
+
+# A published list holds the installed extensions, one per line, and a -id
+# line for each one this machine removed, so a removal also reaches a machine
+# that never saw the extension in this list.
+installed_of() {
+  local l out=''
+  while IFS= read -r l; do [ -n "$l" ] && [ "${l:0:1}" != - ] && out+=$l$'\n'; done <<<"$1"
+  printf '%s' "$out"
+}
+removed_of() {
+  local l out=''
+  while IFS= read -r l; do [ "${l:0:1}" = - ] && out+=${l:1}$'\n'; done <<<"$1"
+  printf '%s' "$out"
+}
+
+# Publishes $ext_cur, with the removals already published and those since.
+# The cache keeps the list in clear, so an unchanged one needs no
+# encryption, and its mtime says when the extensions were last listed.
+ext_publish() {
+  local own='' gone removed l lines
+  read_file "$ext_cache/own" own
+  gone=$(minus "$(installed_of "$own")" "$ext_cur")
+  removed=$(minus "$(sorted "$(removed_of "$own")" "$gone")" "$ext_cur")
+  lines=$(sorted "$ext_cur" "$(while IFS= read -r l; do [ -n "$l" ] && printf -- '-%s\n' "$l"; done <<<"$removed")")
+  mkdir -p "$src/$ext_dir" "$ext_cache"
+  if [ "$lines" != "$(sorted "$own")" ] || [ ! -f "$src/$ext_dir/$ext_host.age" ]; then
+    printf '%s\n' "$lines" | chezmoi encrypt >"$src/$ext_dir/$ext_host.age.tmp" || return 1
+    mv -f "$src/$ext_dir/$ext_host.age.tmp" "$src/$ext_dir/$ext_host.age"
+  fi
+  printf '%s\n' "$lines" >"$ext_cache/own"
+}
+
+# Before the commit: publish this machine's list when VS Code changed it.
+ext_pre() {
+  [ -d "$vscode" ] && command -v code >/dev/null 2>&1 || return 0
+  # A * in the VS Code tree's .chezmoiignore leaves the extensions out too.
+  load_ignores "$src/.dotfiles-sync/vscode/.chezmoiignore"
+  excluded extensions && return 0
+  ext_on=1
+  # DOTFILES_SYNC_HOST tells apart two machines that share a hostname.
+  ext_host=${DOTFILES_SYNC_HOST:-$(hostname)}
+  ext_host=${ext_host//[^A-Za-z0-9._-]/_}
+  [ -f "$ext_cache/own" ] && [ ! "$ext_json" -nt "$ext_cache/own" ] && return 0
+  ext_list || return 0
+  ext_publish
+}
+
+# After the push, so a run cut short by the hook timeout loses no sync: apply
+# what the other machines changed, then publish this machine's new list.
+ext_post() {
+  [ -n "$ext_on" ] || return 0
+  local f h list set seen='' removes adds e failed='' n_added=0 n_dropped=0 bad=()
+  read_file "$ext_cache/failed" failed
+  for f in "$src/$ext_dir"/*.age; do
+    [ -f "$f" ] || continue
+    h=${f##*/}
+    h=${h%.age}
+    [ "$h" = "$ext_host" ] && continue
+    # A pull rewrites the file only when that machine's list changed.
+    [ -f "$ext_cache/seen-$h" ] && [ ! "$f" -nt "$ext_cache/seen-$h" ] && continue
+    list=$(chezmoi decrypt "$f" 2>/dev/null) || continue
+    list=$(sorted "${list//$'\r'/}")
+    set=$(installed_of "$list")
+    ext_list || return 0
+    seen=''
+    removes=''
+    if [ -f "$ext_cache/seen-$h" ]; then
+      read_file "$ext_cache/seen-$h" seen
+      removes=$(sorted "$(minus "$(installed_of "$seen")" "$set")" "$(minus "$(removed_of "$list")" "$(removed_of "$seen")")")
+    fi
+    adds=$(minus "$(minus "$(minus "$set" "$(installed_of "$seen")")" "$ext_cur")" "$failed")
+    while IFS= read -r e; do
+      [ -n "$e" ] || continue
+      if code --install-extension "$e" >/dev/null 2>&1; then
+        ext_cur=$(sorted "$ext_cur" "$e")
+        n_added=$((n_added + 1))
+      else
+        # An extension built for one OS fails on the others at every run.
+        mkdir -p "$ext_cache"
+        printf '%s\n' "$e" >>"$ext_cache/failed"
+        failed+=$e$'\n'
+        bad+=("$e")
+      fi
+    done <<<"$adds"
+    while IFS= read -r e; do
+      if [ -z "$e" ] || ! has_line "$e" "$ext_cur"; then continue; fi
+      code --uninstall-extension "$e" >/dev/null 2>&1 || continue
+      ext_cur=$(minus "$ext_cur" "$e")
+      n_dropped=$((n_dropped + 1))
+    done <<<"$removes"
+    mkdir -p "$ext_cache"
+    printf '%s\n' "$list" >"$ext_cache/seen-$h"
+  done
+  if [ $((n_added + n_dropped)) -gt 0 ]; then
+    say "VS Code extensions: $n_added installed, $n_dropped removed"
+    # Published at once: an extension removed here before the next run must
+    # have been seen in this machine's list, or the others would keep it.
+    ext_publish && git -C "$src" add -- "$ext_dir/$ext_host.age" &&
+      git -C "$src" commit -q -m "sync: $ext_host extensions" &&
+      git -C "$src" push -q 2>/dev/null
+  fi
+  [ ${#bad[@]} -gt 0 ] && say "could not install ${#bad[@]} VS Code extension(s), such as ${bad[0]}; skipped on this machine from now on"
+  return 0
+}
+
+
 # Same capture as the home folder, one tree at a time. Returns 1 on a failure,
 # so the pull never runs over changes it could not save. A project also sets
 # list, its candidate files, which the marker keeps for the next run.
@@ -493,6 +633,7 @@ capture_tree() {
   return 0
 }
 
+ext_pre
 for ((i = 0; i < ${#tree_src[@]}; i++)); do
   tsrc=${tree_src[$i]} tdest=${tree_dest[$i]} mark=${tree_mark[$i]} tabs=${tree_abs[$i]}
   if ! capture_tree; then
@@ -603,4 +744,5 @@ done
 if [ -n "$(git -C "$src" log --format=%H '@{u}..HEAD' 2>/dev/null)" ]; then
   err=$(LC_ALL=C git -C "$src" push -q 2>&1 >/dev/null) || remote_failed push "$err" "will retry next session"
 fi
+ext_post
 exit 0

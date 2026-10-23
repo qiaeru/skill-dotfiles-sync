@@ -31,7 +31,7 @@ check() {
 # VS Code and GitHub CLI folders through APPDATA or XDG_CONFIG_HOME, which
 # must point into the sandbox too, or it would sync the real ones.
 on() {
-  export HOME="$SB/$1"
+  export HOME="$SB/$1" DOTFILES_SYNC_HOST=$1
   unset GH_CONFIG_DIR
   if command -v cygpath >/dev/null; then
     export USERPROFILE APPDATA
@@ -59,6 +59,29 @@ ghdir() {
 # of macOS with /bin/bash tests/sync-test.sh.
 sync() { "$BASH" "$SYNC"; }
 src() { chezmoi source-path; }
+
+# A fake VS Code CLI, first on PATH, so the hook never touches the real
+# extensions. Each home keeps its own list; a win.* extension only installs on
+# machine A, as one built for a single OS would.
+mkdir -p "$SB/bin"
+cat >"$SB/bin/code" <<'FAKE'
+#!/usr/bin/env bash
+list="$HOME/.fake-code-extensions"
+touch "$list"
+case "$1" in
+  --list-extensions) cat "$list"; exit 0 ;;
+  --install-extension)
+    case "$2:$HOME" in win.*:*/A) ;; win.*) exit 1 ;; esac
+    echo "$2" >>"$list" ;;
+  --uninstall-extension) grep -vx "$2" "$list" >"$list.tmp"; mv "$list.tmp" "$list" ;;
+esac
+mkdir -p "$HOME/.vscode/extensions"
+touch "$HOME/.vscode/extensions/extensions.json"
+FAKE
+chmod +x "$SB/bin/code"
+export PATH="$SB/bin:$PATH"
+[ "$(command -v code)" = "$SB/bin/code" ] || { echo "the fake code is not first on PATH"; exit 1; }
+exts() { LC_ALL=C sort "$HOME/.fake-code-extensions" 2>/dev/null | tr '\n' ' '; }
 
 git init -q --bare -b main "$SB/remote.git"
 chezmoi age-keygen -o "$SB/key.txt" 2>/dev/null
@@ -361,6 +384,50 @@ on A
 mkdir -p "$(ghdir)"
 sync >/dev/null
 check "the GitHub CLI config reaches the other machine" 'grep -q "pr checkout" "$(ghdir)/config.yml"'
+
+# VS Code extensions travel as a list, applied after the push. The sleeps
+# keep the mtime checks apart on filesystems with 1 s mtimes.
+sleep 1
+code --install-extension a.one
+code --install-extension win.only
+sync >/dev/null
+on B
+sleep 1
+out=$(sync)
+check "an extension installed on one machine reaches the other" \
+  '[ "$(exts)" = "a.one " ] && grep -q "1 installed" <<<"$out"'
+check "an extension that fails to install is named" 'grep -q "could not install 1 VS Code" <<<"$out"'
+sleep 1
+code --uninstall-extension a.one
+out=$(sync)
+check "a failed extension is not retried" '! grep -q "could not install" <<<"$out"'
+on A
+sleep 1
+sync >/dev/null
+check "an extension removed on one machine leaves the other" '[ "$(exts)" = "win.only " ]'
+code --install-extension a.two
+sync >/dev/null
+on D
+mkdir -p "$(vscode)"
+code --install-extension d.only
+sync >/dev/null
+check "a first run merges both lists and removes nothing" \
+  '[ "$(exts)" = "a.two d.only " ]'
+sleep 1
+sync >/dev/null
+on A
+sleep 1
+sync >/dev/null
+check "a first run's extensions reach the other machines" '[ "$(exts)" = "a.two d.only win.only " ]'
+on B
+sleep 1
+sync >/dev/null
+check "an extension a machine could not install stays on the others" '[ "$(exts)" = "a.two d.only " ]'
+on A
+sync >/dev/null
+check "each machine publishes its own list, in ciphertext" \
+  '[ "$(git --git-dir="$SB/remote.git" ls-tree --name-only main .dotfiles-sync/vscode-extensions/ | wc -l)" -eq 3 ] && ! git --git-dir="$SB/remote.git" grep -q d.only main' 
+check "A keeps the extension B could not install" '[ "$(exts)" = "a.two d.only win.only " ]'
 
 # A tree whose apply failed is applied at the next sync, though that pull
 # brings nothing new. A chezmoi earlier on PATH fails the VS Code apply once.

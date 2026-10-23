@@ -15,7 +15,7 @@ Each domain has its own reference. Read it before acting on a file of that domai
 - [references/git.md](references/git.md): `~/.gitconfig` and `~/.config/git/`, values that differ per machine;
 - [references/ssh.md](references/ssh.md): `~/.ssh`, private keys, `known_hosts`, permissions;
 - [references/projects.md](references/projects.md): the per-machine list of project folders, fresh clones, files a project starts tracking;
-- [references/vscode.md](references/vscode.md): the VS Code user folder on each OS, VS Code's own Settings Sync;
+- [references/vscode.md](references/vscode.md): the VS Code user folder on each OS, extensions, VS Code's own Settings Sync;
 - [references/github-cli.md](references/github-cli.md): the GitHub CLI folder, the token file that never syncs.
 
 ## What syncs
@@ -28,7 +28,7 @@ The hook reaches four roots in the home folder (`.claude`, `.gitconfig`, `.confi
 | Git | `~/.gitconfig`, `~/.config/git/config`, `~/.config/git/ignore`, `~/.config/git/attributes` |
 | SSH | `~/.ssh/config`, every file under `~/.ssh/config.d/`, `~/.ssh/*.pub` |
 | Projects | at any depth and only when the project's Git does not track them: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/settings.json`, `.claude/settings.local.json`, every file under `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, and `.vscode/` `settings.json`, `launch.json`, `tasks.json`, `extensions.json`, `*.code-snippets`; never under `node_modules/` |
-| VS Code | `settings.json`, `keybindings.json`, every file under `snippets/` |
+| VS Code | `settings.json`, `keybindings.json`, every file under `snippets/`, and the installed extensions ([references/vscode.md](references/vscode.md)) |
 | GitHub CLI | `config.yml`, never `hosts.yml` |
 
 Projects, VS Code, and the GitHub CLI sit at different paths on each machine, so each one is its own chezmoi source under `.dotfiles-sync/` in the source repo (`projects/<folder name>/`, `vscode/`, `gh/`), applied with `--source` and `--destination`. A file anywhere else in the home roots (a private key, `known_hosts`) is left alone until it is added by hand with `chezmoi add --encrypt <path>`. From then on, the hook syncs its edits and its deletion like the rest. The hook also skips `.credentials.json`, `credentials.json`, `.env`, `.env.*`, `__pycache__/`, `.git/`, `node_modules/`, `.venv/`, `.DS_Store`, `Thumbs.db`, editor swap and backup files (`*.swp`, `*~`), symlinks, `~/.claude/skills/synced/`, `~/.claude/skills/.trash/` (where Claude Code moves the skills it removes), and every path matched by a plain glob line in the source repo's `.chezmoiignore`.
