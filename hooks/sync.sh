@@ -185,22 +185,27 @@ escape_globs() {
 # and different, it wins and is captured, since it may hold work the repo
 # never saw. With fresh=1 (a new clone of a project), every file counts as
 # never written, whatever an earlier clone at the same path left in the state.
+# Sets left when a line is not captured, so only the apply can bring it.
 classify() {
   local status=$1 dest=$2 fresh=$3 line path
   removed=()
   changed=()
+  left=
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     path=${line:3}
     [ -z "$dest" ] && ! in_scope "$path" && continue
     case "${line:0:2}" in
-      D?) [ "$fresh" = 1 ] || removed+=("$path") ;;
+      D?) if [ "$fresh" = 1 ]; then left=1; else removed+=("$path"); fi ;;
       M?) changed+=("$path") ;;
       ' M')
         if [ "$fresh" = 1 ] || [[ $written != *"\"${dest:-$home_abs}/$path\":"* ]]; then
           changed+=("$path")
+        else
+          left=1
         fi
         ;;
+      *) left=1 ;;
     esac
   done <<<"$status"
 }
@@ -276,6 +281,10 @@ status=$(chezmoi status --include=files 2>/dev/null) || {
   exit 0
 }
 classify "$status" "" 0
+# The home apply runs only when something waits for it: a source-side change
+# found here (a reset, a file never applied), a change the pull brings, a root
+# renamed this run, or an apply that failed before.
+home_apply=$left
 
 # Deletions. Without .chezmoiremove the apply below would bring the file
 # back, and the other machines would never drop it.
@@ -364,6 +373,7 @@ for d in "${DIRS[@]}"; do
     candidate "$path"
   done < <(find "$d" -type f)
 done
+[ -n "$rm_hit" ] && home_apply=1
 drop_large "$HOME/"
 if [ ${#added[@]} -gt 0 ]; then
   chezmoi add --encrypt --no-tty "${added[@]}" || {
@@ -388,6 +398,8 @@ while IFS= read -r p; do
 done <<<"$now"
 if [ ${#private[@]} -gt 0 ]; then
   chezmoi chattr --no-tty +private "${private[@]}" || say "could not make ${private[*]} private in the source repo"
+  # The apply sets the new mode on the folder.
+  home_apply=1
   sources+=$'\n'$now
   now=$(source_roots)
 fi
@@ -730,7 +742,7 @@ done < <(printf '%s\n' "$sources" .chezmoiremove .chezmoiignore .dotfiles-sync |
 # unstaged deletion.
 while IFS= read -r -d '' p; do
   target_of "$p"
-  in_scope "$target" && tracked+=("$p")
+  in_scope "$target" && tracked+=("$p") && home_apply=1
 done < <(git -C "$src" ls-files --deleted -z)
 [ ${#tracked[@]} -gt 0 ] && git -C "$src" add -A -- "${tracked[@]}"
 if ! git -C "$src" diff --cached --quiet; then
@@ -755,40 +767,55 @@ if ! err=$(LC_ALL=C git -C "$src" pull -q --rebase 2>&1 >/dev/null); then
   exit 0
 fi
 
+# What the pull changed: the trees' paths, and anything else for the home.
+pulled_src=
+if [ -z "$before" ]; then
+  home_apply=1
+else
+  while IFS= read -r -d '' p; do
+    case "$p" in
+      .dotfiles-sync/*) pulled_src+=$'\n'$p ;;
+      *) home_apply=1 ;;
+    esac
+  done < <(git -C "$src" diff -z --name-only "$before" HEAD 2>/dev/null)
+fi
+# Applies that failed at an earlier run, "." for the home: the pull that
+# brought the change will not bring it again.
+pending_file="$src/.git/dotfiles-sync.pending"
+pending=
+[ -f "$pending_file" ] && IFS= read -r -d '' pending <"$pending_file"
+has_line . "$pending" && home_apply=1
+still_pending=
+
 # chezmoi apply refuses a root it does not manage. A root left with only
 # pending removals is not listed, but the removals are, and go in one by one
 # so the deletions reach this machine.
-all=$(chezmoi managed --include=all --path-style relative 2>/dev/null)
-targets=()
-for r in "${ROOTS[@]}"; do
-  if has_line "$r" "$all"; then
-    targets+=("$r")
-  else
-    while IFS= read -r path; do
-      [[ $path == "$r"/* ]] && targets+=("$path")
-    done <<<"$all"
-  fi
-done
 pulled=0
-if [ ${#targets[@]} -gt 0 ]; then
-  pulled=$(chezmoi status --include=files,remove "${targets[@]}" 2>/dev/null | wc -l)
-  chezmoi apply --force --no-tty "${targets[@]}" || {
-    say "could not apply the pulled files; run 'chezmoi apply -v ${targets[*]}' to see why"
-    exit 0
-  }
+if [ -n "$home_apply" ]; then
+  all=$(chezmoi managed --include=all --path-style relative 2>/dev/null)
+  targets=()
+  for r in "${ROOTS[@]}"; do
+    if has_line "$r" "$all"; then
+      targets+=("$r")
+    else
+      while IFS= read -r path; do
+        [[ $path == "$r"/* ]] && targets+=("$path")
+      done <<<"$all"
+    fi
+  done
+  if [ ${#targets[@]} -gt 0 ]; then
+    pulled=$(chezmoi status --include=files,remove "${targets[@]}" 2>/dev/null | wc -l)
+    if ! chezmoi apply --force --no-tty "${targets[@]}"; then
+      say "could not apply the pulled files; run 'chezmoi apply -v ${targets[*]}' to see why"
+      has_line . "$pending" || printf '.\n' >>"$pending_file"
+      exit 0
+    fi
+  fi
 fi
 
 # A tree is applied when the pull changed its source, when it is a fresh
 # clone, which may lack files the repo already holds, or when its apply failed
-# at an earlier run: the pull that brought the change will not bring it again.
-pulled_src=
-while IFS= read -r -d '' p; do
-  pulled_src+=$'\n'$p
-done < <(git -C "$src" diff -z --name-only "$before" HEAD -- .dotfiles-sync 2>/dev/null)
-pending_file="$src/.git/dotfiles-sync.pending"
-pending=
-[ -f "$pending_file" ] && IFS= read -r -d '' pending <"$pending_file"
-still_pending=
+# at an earlier run.
 for ((i = 0; i < ${#tree_src[@]}; i++)); do
   tsrc=${tree_src[$i]} tdest=${tree_dest[$i]} mark=${tree_mark[$i]}
   [ -d "$tsrc" ] || continue

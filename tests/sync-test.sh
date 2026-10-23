@@ -153,6 +153,18 @@ commits=$(git -C "$(src)" rev-list --count HEAD)
 sync >/dev/null
 check "an idle sync makes no commit" '[ "$(git -C "$(src)" rev-list --count HEAD)" = "$commits" ]'
 
+# With nothing pulled and nothing waiting, the home apply is skipped. A
+# chezmoi earlier on PATH logs every call.
+mkdir -p "$SB/logging"
+cat >"$SB/logging/chezmoi" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >>"$SB/chezmoi.log"
+exec "$(command -v chezmoi)" "\$@"
+EOF
+chmod +x "$SB/logging/chezmoi"
+PATH="$SB/logging:$PATH" sync >/dev/null
+check "an idle sync skips the home apply" '[ -s "$SB/chezmoi.log" ] && ! grep -q "^apply" "$SB/chezmoi.log"'
+
 # The files CLAUDE.md imports and the status line script travel. A new file
 # over 1 MB stays out, and the hook names it once.
 echo '# style' >.claude/style.md

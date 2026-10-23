@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- The hook starts fewer processes, which shortens a sync on Windows.
+- The hook starts fewer processes, which shortens a sync on Windows, and skips the apply in the home folder when there is nothing to apply.
 
 ### Fixed
 
