@@ -159,6 +159,21 @@ abs() {
   if [ -n "$win" ]; then cygpath -m "$@"; else printf '%s\n' "$@"; fi
 }
 
+# chezmoi reads the lines of .chezmoiremove and .chezmoiignore as globs, so a
+# path holding * ? [ { would also match other files there. Sets $escaped.
+escape_globs() {
+  local p b=\\
+  escaped=()
+  for p in "$@"; do
+    p=${p//\\/"$b$b"}
+    p=${p//\*/"$b*"}
+    p=${p//\?/"$b?"}
+    p=${p//\[/"${b}["}
+    p=${p//\{/"$b{"}
+    escaped+=("$p")
+  done
+}
+
 # Sorts chezmoi status lines into deletions and edits, read against the last
 # state chezmoi wrote here. The first column flags a file deleted (D) or
 # edited (M) since then. A blank one means the disk still holds what chezmoi
@@ -267,7 +282,8 @@ if [ ${#removed[@]} -gt 0 ]; then
     say "could not record ${#removed[@]} deleted file(s)"
     exit 0
   }
-  printf '%s\n' "${removed[@]}" >>"$src/.chezmoiremove"
+  escape_globs "${removed[@]}"
+  printf '%s\n' "${escaped[@]}" >>"$src/.chezmoiremove"
 fi
 
 # Edits to files already managed.
@@ -309,7 +325,8 @@ drop_large() {
 }
 unremove() {
   [ -f "$1" ] || return 0
-  grep -Fxv -f <(printf '%s\n' "${added[@]}") "$1" >"$1.tmp"
+  escape_globs "${added[@]}"
+  grep -Fxv -f <(printf '%s\n' "${escaped[@]}") "$1" >"$1.tmp"
   mv "$1.tmp" "$1"
 }
 for f in "${FILES[@]}"; do candidate "$f"; done
@@ -619,7 +636,8 @@ capture_tree() {
       while IFS= read -r -d '' path; do tracked+=("$path"); done < <(git ls-files -z -- "${specs[@]}")
       if [ ${#tracked[@]} -gt 0 ]; then
         cz forget --force --no-tty "${tracked[@]}" || return 1
-        printf '%s\n' "${tracked[@]}" >>"$tsrc/.chezmoiignore"
+        escape_globs "${tracked[@]}"
+        printf '%s\n' "${escaped[@]}" >>"$tsrc/.chezmoiignore"
         load_ignores "$tsrc/.chezmoiignore"
         managed=$(cz managed --include=files --path-style relative 2>/dev/null) || return 1
       fi
@@ -628,7 +646,8 @@ capture_tree() {
     classify "$status" "$tabs" "$fresh"
     if [ ${#removed[@]} -gt 0 ]; then
       cz forget --force --no-tty "${removed[@]}" || return 1
-      printf '%s\n' "${removed[@]}" >>"$tsrc/.chezmoiremove"
+      escape_globs "${removed[@]}"
+      printf '%s\n' "${escaped[@]}" >>"$tsrc/.chezmoiremove"
     fi
     if [ ${#changed[@]} -gt 0 ]; then
       cz re-add --no-tty "${changed[@]}" || return 1
