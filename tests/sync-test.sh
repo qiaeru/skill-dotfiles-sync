@@ -472,6 +472,18 @@ check "an authentication failure is named, not taken for offline" \
   'grep -q "could not log in" <<<"$out" && ! grep -q offline <<<"$out"'
 sync >/dev/null
 
+# The extra push after extension changes names its failure too. B has
+# nothing else to push, so the message can only come from that push.
+on A
+sleep 1
+code --install-extension a.three
+sync >/dev/null
+on B
+sleep 1
+out=$(PATH="$SB/failing:$PATH" sync)
+check "a failed extensions push is named" 'grep -q "1 installed" <<<"$out" && grep -q "could not log in" <<<"$out"'
+sync >/dev/null
+
 # A * in a tree's .chezmoiignore leaves that tree out, here VS Code.
 echo '*' >"$(src)/.dotfiles-sync/vscode/.chezmoiignore"
 echo '{"editor.fontSize":20}' >"$(vscode)/settings.json"

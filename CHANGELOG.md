@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - Deleting a file whose name holds `[`, `*`, `?`, or `{`, such as `a[1].md`, no longer blocks the sync on the other machines, or deletes files there whose names match it as a pattern.
+- A failed push after VS Code extension changes is now reported like any other push.
 
 ## [1.2.0] - 2026-10-23
 

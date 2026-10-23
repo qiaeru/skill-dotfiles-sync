@@ -587,9 +587,11 @@ ext_post() {
     say "VS Code extensions: $n_added installed, $n_dropped removed"
     # Published at once: an extension removed here before the next run must
     # have been seen in this machine's list, or the others would keep it.
-    ext_publish && git -C "$src" add -- "$ext_dir/$ext_host.age" &&
-      git -C "$src" commit -q -m "sync: $host extensions" &&
-      git -C "$src" push -q 2>/dev/null
+    # After a failed push, the next run sends both commits.
+    if ext_publish && git -C "$src" add -- "$ext_dir/$ext_host.age" &&
+      git -C "$src" commit -q -m "sync: $host extensions" && [ -z "$push_failed" ]; then
+      err=$(LC_ALL=C git -C "$src" push -q 2>&1 >/dev/null) || remote_failed push "$err" "will retry next session"
+    fi
   fi
   [ ${#bad[@]} -gt 0 ] && say "could not install ${#bad[@]} VS Code extension(s), such as ${bad[0]}; skipped on this machine from now on"
   return 0
@@ -782,8 +784,12 @@ done
 # BSD wc pads its count with spaces; the arithmetic drops them.
 [ "$pulled" -gt 0 ] && say "updated $((pulled)) file(s) from another machine"
 
+push_failed=
 if [ -n "$(git -C "$src" log --format=%H '@{u}..HEAD' 2>/dev/null)" ]; then
-  err=$(LC_ALL=C git -C "$src" push -q 2>&1 >/dev/null) || remote_failed push "$err" "will retry next session"
+  if ! err=$(LC_ALL=C git -C "$src" push -q 2>&1 >/dev/null); then
+    remote_failed push "$err" "will retry next session"
+    push_failed=1
+  fi
 fi
 ext_post
 exit 0
