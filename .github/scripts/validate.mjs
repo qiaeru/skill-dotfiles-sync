@@ -150,9 +150,52 @@ for (const entry of marketplace.plugins ?? []) {
   }
 }
 
+// 7. The project allow-list in project_file() is repeated in the README,
+// SKILL.md, and references/projects.md, and the PROJECT_SPECS pathspec in
+// front of it (copied in the setup of SKILL.md) must cover it: a file added
+// in one place only is undocumented, or never found.
+const sync = read('hooks/sync.sh');
+const allowed = [];
+const body = sync.match(/^project_file\(\) \{\n([\s\S]*?)\n\}/m)?.[1] ?? '';
+for (const arm of body.replace(/\\\n/g, ' ').split('\n')) {
+  const m = arm.match(/^\s*(.+?)\)\s*return 0/);
+  if (m) for (const p of m[1].split('|')) allowed.push(p.trim().replace(/^\*\//, ''));
+}
+if (allowed.length === 0) report('hooks/sync.sh', null, 'no allow-list found in project_file()');
+const specsOf = (text) => [...text.matchAll(/':\(glob\)\*\*\/([^']+)'/g)].map((m) => m[1]);
+const specs = specsOf(sync.match(/^PROJECT_SPECS=\(([\s\S]*?)\)$/m)?.[1] ?? '');
+for (const p of allowed) {
+  const covered = specs.some((s) => s === p || (s.endsWith('/**') && p.startsWith(s.slice(0, -2))));
+  if (!covered) report('hooks/sync.sh', null, `PROJECT_SPECS does not cover ${p} from project_file()`);
+}
+const skillFile = path.join('skills', 'syncing-dotfiles', 'SKILL.md');
+const setupSpecs = specsOf(read(skillFile));
+if ([...setupSpecs].sort().join() !== [...specs].sort().join()) {
+  report(skillFile, null, 'the setup pathspec differs from PROJECT_SPECS in hooks/sync.sh');
+}
+const docLines = [
+  ['README.md', /^\| Projects \|.*$/m],
+  [skillFile, /^\| Projects \|.*$/m],
+  [path.join('skills', 'syncing-dotfiles', 'references', 'projects.md'), /^At any depth.*$/m],
+];
+for (const [file, pattern] of docLines) {
+  const line = read(file).match(pattern)?.[0];
+  if (!line) {
+    report(file, null, 'no line listing the project allow-list');
+    continue;
+  }
+  for (const p of allowed) {
+    const base = p.endsWith('/*') ? `${p.slice(0, -2).split('/').pop()}/` : p.split('/').pop();
+    const stem = base.replace(/\.json$/, '');
+    if (!line.includes(base) && !line.includes(`\`${stem}\``)) {
+      report(file, null, `the project allow-list does not mention ${p}`);
+    }
+  }
+}
+
 if (errors.length > 0) {
   console.error(`${errors.length} invariant error(s):`);
   for (const e of errors) console.error(`  ${e}`);
   process.exit(1);
 }
-console.log(`Invariants checked on ${proseFiles.length} files: frontmatter, links, typography, hook scripts, version, descriptions.`);
+console.log(`Invariants checked on ${proseFiles.length} files: frontmatter, links, typography, hook scripts, version, descriptions, project allow-list.`);
