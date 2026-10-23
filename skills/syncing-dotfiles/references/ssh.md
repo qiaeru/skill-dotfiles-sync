@@ -6,6 +6,10 @@ A `config.d/` folder is a convention, not an SSH default. It only works with `In
 
 `~/.ssh` must stay closed to other users, or SSH refuses the keys inside. The hook marks the `.ssh` and `.claude` source folders `private_`, so chezmoi writes them as 700 on Linux and macOS whatever OS added them first.
 
+## Options that only one OS knows
+
+A synced `config` reaches every OS, and OpenSSH on Linux stops at an option it does not know. The common case is macOS's `UseKeychain yes`: put `IgnoreUnknown UseKeychain` above it, at the top of the file, so the other machines skip the line. An `IdentityFile` or `IdentityAgent` with an absolute path (`C:\Users\...`, `/Users/...`) breaks the same way; prefer `~/.ssh/<key>`, which every OS expands.
+
 ## Private keys
 
 First, advise against syncing them. One key per machine is the safer default: a lost laptop means revoking one key on GitHub and the servers, not every key the person owns. A synced private key is as safe as the age key: whoever holds `key.txt` and the repo holds the SSH key too.

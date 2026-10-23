@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- The skill covers settings and scripts that only work on one OS: absolute paths in `settings.json`, scripts added on Windows without the executable bit, and macOS-only SSH options such as `UseKeychain`.
+
 ### Fixed
 
 - `~/.ssh` and `~/.claude` no longer land as 755 folders on Linux and macOS when the first machine runs Windows.
