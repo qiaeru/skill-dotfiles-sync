@@ -33,4 +33,6 @@ A deleted or abandoned project keeps its files in the source repo, and any machi
 
 ## A file the project starts tracking
 
-When a synced file gets committed to the project's Git, the hook stops managing it and writes its path to the project's `.chezmoiignore` in the source repo, so a machine that has not pulled the project yet does not add it back. The file stays on every disk, and from then on travels with the project. To sync it through the hook again, untrack it in the project's Git and remove its line from `.dotfiles-sync/projects/<name>/.chezmoiignore`.
+When a synced file gets committed to the project's Git, the hook stops managing it and writes its path to `.dotfiles-sync/projects/<name>/.tracked` in the source repo, so a machine that has not pulled the project yet does not add it back. The file stays on every disk, and from then on travels with the project.
+
+When the project stops tracking it (`git rm --cached`), the hook syncs it again, since the project's history shows it was tracked once, and drops its line from `.tracked`. A machine whose `git pull` of the project deleted the file gets it back at its next sync. Earlier versions of the hook wrote these paths to the project's `.chezmoiignore` instead: a line there that names a file the project no longer tracks keeps that file out of the sync for good, so delete the line, then sync.

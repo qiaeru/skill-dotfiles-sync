@@ -638,7 +638,7 @@ ext_post() {
 # so the pull never runs over changes it could not save. A project also sets
 # list, its candidate files, which the marker keeps for the next run.
 capture_tree() {
-  local fresh=0 specs=() tracked=() paths=() path prev=
+  local fresh=0 specs=() tracked=() paths=() untracked=() path tracked_lines='' prev=
   list=
   [ -n "$mark" ] && [ ! -e "$mark" ] && fresh=1
   cd "$tdest" || return 0
@@ -667,16 +667,14 @@ capture_tree() {
   if [ -d "$tsrc" ]; then
     managed=$(cz managed --include=files --path-style relative 2>/dev/null) || return 1
     # A file the project's Git now tracks travels with the project: stop
-    # managing it, but leave it on the other machines. The ignore line keeps
+    # managing it, but leave it on the other machines. The .tracked list keeps
     # a machine that has not pulled the project yet from adding it back.
     if [ -n "$mark" ] && [ -n "$managed" ]; then
       while IFS= read -r path; do specs+=(":(literal)$path"); done <<<"$managed"
       while IFS= read -r -d '' path; do tracked+=("$path"); done < <(git ls-files -z -- "${specs[@]}")
       if [ ${#tracked[@]} -gt 0 ]; then
         cz forget --force --no-tty "${tracked[@]}" || return 1
-        escape_globs "${tracked[@]}"
-        printf '%s\n' "${escaped[@]}" >>"$tsrc/.chezmoiignore"
-        load_ignores "$tsrc/.chezmoiignore"
+        printf '%s\n' "${tracked[@]}" >>"$tsrc/.tracked"
         managed=$(cz managed --include=files --path-style relative 2>/dev/null) || return 1
       fi
     fi
@@ -697,7 +695,22 @@ capture_tree() {
   rm_dest=$tabs
   rm_hit=
   if [ -n "$mark" ]; then
-    for path in ${paths[@]+"${paths[@]}"}; do candidate "$path"; done
+    read_file "$tsrc/.tracked" tracked_lines
+    for path in ${paths[@]+"${paths[@]}"}; do
+      if [ -n "$tracked_lines" ] && has_line "$path" "$tracked_lines"; then
+        # Untracked here but tracked once: the project stopped tracking it,
+        # so it syncs again. Never tracked here: this clone has not pulled
+        # the commit that tracks it yet.
+        [ -n "$(git log -1 --format=%h -- ":(literal)$path" 2>/dev/null)" ] || continue
+        untracked+=("$path")
+      fi
+      candidate "$path"
+    done
+    if [ ${#untracked[@]} -gt 0 ]; then
+      grep -Fxv -f <(printf '%s\n' "${untracked[@]}") "$tsrc/.tracked" >"$tsrc/.tracked.tmp"
+      mv "$tsrc/.tracked.tmp" "$tsrc/.tracked"
+      [ -s "$tsrc/.tracked" ] || rm "$tsrc/.tracked"
+    fi
   elif [ "${tsrc##*/}" = gh ]; then
     # Never hosts.yml: it holds the GitHub token.
     candidate config.yml

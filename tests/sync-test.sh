@@ -412,6 +412,21 @@ sync >/dev/null
 check "a file the project starts tracking leaves the sync, not the disks" \
   '! git --git-dir="$SB/remote.git" ls-tree -r --name-only main | grep -q "^$p/sub/" && [ -f src/proj/sub/CLAUDE.md ] && [ -f "$SB/A/code/proj/sub/CLAUDE.md" ]'
 
+# When the project stops tracking it, the file syncs again, and reaches a
+# machine whose pull of the project deleted it.
+rm src/proj/sub/CLAUDE.md
+git -C src/proj pull -q
+on A
+git -C code/proj rm -q --cached sub/CLAUDE.md
+git -C code/proj commit -q -m untrack
+echo 'untracked on A' >code/proj/sub/CLAUDE.md
+sync >/dev/null
+on B
+git -C src/proj pull -q
+sync >/dev/null
+check "a file the project stops tracking syncs again" \
+  '[ "$(cat src/proj/sub/CLAUDE.md 2>/dev/null)" = "untracked on A" ] && [ ! -e "$(src)/$p/.tracked" ]'
+
 # The GitHub CLI config travels, its token file never does.
 mkdir -p "$(ghdir)"
 printf 'aliases:\n    co: pr checkout\n' >"$(ghdir)/config.yml"
