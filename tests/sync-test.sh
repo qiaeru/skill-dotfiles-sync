@@ -130,13 +130,18 @@ commits=$(git -C "$(src)" rev-list --count HEAD)
 sync >/dev/null
 check "an idle sync makes no commit" '[ "$(git -C "$(src)" rev-list --count HEAD)" = "$commits" ]'
 
-# The files CLAUDE.md imports and the status line script travel.
+# The files CLAUDE.md imports and the status line script travel. A new file
+# over 1 MB stays out, and the hook names it once.
 echo '# style' >.claude/style.md
 echo 'echo ok' >.claude/statusline-command.sh
+head -c 2000000 /dev/zero >.claude/skills/foo/big.bin
 out=$(sync)
 remote_files=$(git --git-dir="$SB/remote.git" ls-tree -r --name-only main)
 check "the files CLAUDE.md imports and the status line script reach the remote" \
   'grep -q "^private_dot_claude/encrypted_style.md.age$" <<<"$remote_files" && grep -q statusline-command <<<"$remote_files"'
+check "a new file over 1 MB is left out and named" '! grep -q big.bin <<<"$remote_files" && grep -q "over 1 MB" <<<"$out"'
+out=$(sync)
+check "a large file is named only once" '! grep -q "over 1 MB" <<<"$out"'
 
 # Machine B: joins with chezmoi init --apply, then edits, adds, deletes.
 mkdir -p "$SB/B"

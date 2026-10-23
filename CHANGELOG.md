@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - The Markdown files at the top of `~/.claude`, such as the ones `CLAUDE.md` imports, and the status line script now sync.
+- A new file over 1 MB is left out and named once, so large files don't bloat the repo with a full encrypted copy at each edit.
 - The skill covers settings and scripts that only work on one OS: absolute paths in `settings.json`, scripts added on Windows without the executable bit, and macOS-only SSH options such as `UseKeychain`.
 
 ### Fixed

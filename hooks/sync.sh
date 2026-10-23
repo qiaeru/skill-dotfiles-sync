@@ -227,6 +227,8 @@ export GIT_TERMINAL_PROMPT=0
 
 # Two sessions starting or ending together would race on the same checkout.
 lock="$src/.git/dotfiles-sync.lock"
+# Machine-local, like the lock: the large files already named here.
+large_file="$src/.git/dotfiles-sync.large"
 if ! mkdir "$lock" 2>/dev/null; then
   # A run lasts at most 60 s, so a lock older than two minutes was left by a
   # killed one.
@@ -275,6 +277,30 @@ candidate() {
 }
 # A file deleted earlier and created again must leave the removal list, or
 # the next apply deletes it.
+# age ciphertext does not delta-compress, so each edit of a large file stores
+# a full copy in the repo. A new file over 1 MB is left out of $added and
+# named once per machine; added by hand, it then syncs like the rest. $1
+# prefixes the paths in the message.
+drop_large() {
+  [ ${#added[@]} -gt 0 ] || return 0
+  local big='' seen='' keep=() new=() p
+  while IFS= read -r p; do
+    big+=${p#./}$'\n'
+  done < <(find "${added[@]/#/./}" -maxdepth 0 -size +1024k 2>/dev/null)
+  [ -n "$big" ] || return 0
+  [ -f "$large_file" ] && IFS= read -r -d '' seen <"$large_file"
+  for p in "${added[@]}"; do
+    if ! has_line "$p" "$big"; then
+      keep+=("$p")
+    elif ! has_line "$1$p" "$seen"; then
+      new+=("$1$p")
+      printf '%s\n' "$1$p" >>"$large_file"
+    fi
+  done
+  added=(${keep[@]+"${keep[@]}"})
+  [ ${#new[@]} -gt 0 ] && say "left out ${#new[@]} new file(s) over 1 MB, such as ${new[0]}; ask Claude to add one by hand to sync it anyway"
+  return 0
+}
 unremove() {
   [ -f "$1" ] || return 0
   grep -Fxv -f <(printf '%s\n' "${added[@]}") "$1" >"$1.tmp"
@@ -292,6 +318,7 @@ for d in "${DIRS[@]}"; do
     candidate "$path"
   done < <(find "$d" -type f)
 done
+drop_large "$HOME/"
 if [ ${#added[@]} -gt 0 ]; then
   chezmoi add --encrypt --no-tty "${added[@]}" || {
     say "could not add ${#added[@]} new file(s); nothing was pulled, to keep them safe"
@@ -457,6 +484,7 @@ capture_tree() {
       while IFS= read -r path; do candidate "$path"; done < <(find snippets -type f)
     fi
   fi
+  drop_large "$tdest/"
   if [ ${#added[@]} -gt 0 ]; then
     mkdir -p "$tsrc"
     cz add --encrypt --no-tty "${added[@]}" || return 1
