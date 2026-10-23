@@ -124,7 +124,7 @@ excluded() {
 source_roots() {
   local r roots=()
   for r in "${ROOTS[@]}"; do
-    [[ $'\n'$managed == *$'\n'"$r"$'\n'* || $'\n'$managed == *$'\n'"$r"/* ]] && roots+=("$r")
+    if has_line "$r" "$managed" || [[ $'\n'$managed == *$'\n'"$r"/* ]]; then roots+=("$r"); fi
   done
   [ ${#roots[@]} -gt 0 ] || return 0
   chezmoi source-path "${roots[@]}" 2>/dev/null && return 0
@@ -156,7 +156,7 @@ target_of() {
 
 # chezmoi keys its persistent state by absolute path, in its own form.
 abs() {
-  if command -v cygpath >/dev/null 2>&1; then cygpath -m "$@"; else printf '%s\n' "$@"; fi
+  if [ -n "$win" ]; then cygpath -m "$@"; else printf '%s\n' "$@"; fi
 }
 
 # Sorts chezmoi status lines into deletions and edits, read against the last
@@ -205,6 +205,9 @@ remote_failed() {
 for d in "$HOME/.local/bin" "$HOME/bin" /opt/homebrew/bin /usr/local/bin; do
   case ":$PATH:" in *":$d:"*) ;; *) [ -d "$d" ] && PATH=$PATH:$d ;; esac
 done
+# Git Bash on Windows, where paths go through cygpath.
+win=
+command -v cygpath >/dev/null 2>&1 && win=1
 if ! command -v chezmoi >/dev/null 2>&1; then
   # Without chezmoi there is no source to ask for, so the default one stands in.
   [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/chezmoi/.git" ] &&
@@ -224,6 +227,9 @@ fi
 
 # A hook has no terminal to answer a credentials prompt.
 export GIT_TERMINAL_PROMPT=0
+# DOTFILES_SYNC_HOST tells apart two machines that share a hostname. Bash
+# sets HOSTNAME itself, which spares a process.
+host=${DOTFILES_SYNC_HOST:-${HOSTNAME:-$(hostname)}}
 
 # Two sessions starting or ending together would race on the same checkout.
 lock="$src/.git/dotfiles-sync.lock"
@@ -356,12 +362,23 @@ tree_dest=()
 tree_mark=()
 names=
 if [ -f "$PROJECTS_CONF" ]; then
+  lines=()
   while IFS= read -r line; do
     line=${line%$'\r'}
     case "$line" in '' | '#'*) continue ;; esac
     # shellcheck disable=SC2088 # A literal ~ from the file, expanded here.
     [[ $line == '~/'* ]] && line=$HOME/${line#'~/'}
-    command -v cygpath >/dev/null 2>&1 && line=$(cygpath -u "$line")
+    lines+=("$line")
+  done <"$PROJECTS_CONF"
+  # Every line through one cygpath call.
+  if [ -n "$win" ] && [ ${#lines[@]} -gt 0 ]; then
+    i=0
+    while IFS= read -r line; do
+      lines[i]=$line
+      i=$((i + 1))
+    done < <(cygpath -u "${lines[@]}")
+  fi
+  for line in ${lines[@]+"${lines[@]}"}; do
     if [ -e "$line/.git" ]; then repos=("$line"); else repos=("$line"/*/); fi
     for repo in "${repos[@]}"; do
       repo=${repo%/}
@@ -383,11 +400,13 @@ if [ -f "$PROJECTS_CONF" ]; then
       tree_dest+=("$repo")
       tree_mark+=("$gitdir/dotfiles-sync")
     done
-  done <"$PROJECTS_CONF"
+  done
 fi
-if [ -n "${APPDATA:-}" ] && command -v cygpath >/dev/null 2>&1; then
-  vscode=$(cygpath -u "$APPDATA")/Code/User
-elif [ "$(uname)" = Darwin ]; then
+appdata=
+[ -n "$win" ] && [ -n "${APPDATA:-}" ] && appdata=$(cygpath -u "$APPDATA")
+if [ -n "$appdata" ]; then
+  vscode=$appdata/Code/User
+elif [[ $OSTYPE == darwin* ]]; then
   vscode="$HOME/Library/Application Support/Code/User"
 else
   vscode=${XDG_CONFIG_HOME:-$HOME/.config}/Code/User
@@ -399,8 +418,8 @@ if [ -d "$vscode" ]; then
 fi
 if [ -n "${GH_CONFIG_DIR:-}" ]; then
   gh=$GH_CONFIG_DIR
-elif [ -n "${APPDATA:-}" ] && command -v cygpath >/dev/null 2>&1; then
-  gh="$(cygpath -u "$APPDATA")/GitHub CLI"
+elif [ -n "$appdata" ]; then
+  gh="$appdata/GitHub CLI"
 else
   gh=${XDG_CONFIG_HOME:-$HOME/.config}/gh
 fi
@@ -427,7 +446,7 @@ ext_cache="$src/.git/dotfiles-sync-extensions"
 ext_json=$HOME/.vscode/extensions/extensions.json
 if [ -n "${VSCODE_EXTENSIONS:-}" ]; then
   ext_json=$VSCODE_EXTENSIONS/extensions.json
-  command -v cygpath >/dev/null 2>&1 && ext_json=$(cygpath -u "$ext_json")
+  [ -n "$win" ] && ext_json=$(cygpath -u "$ext_json")
 fi
 ext_on=
 ext_host=
@@ -491,9 +510,7 @@ ext_pre() {
   load_ignores "$src/.dotfiles-sync/vscode/.chezmoiignore"
   excluded extensions && return 0
   ext_on=1
-  # DOTFILES_SYNC_HOST tells apart two machines that share a hostname.
-  ext_host=${DOTFILES_SYNC_HOST:-$(hostname)}
-  ext_host=${ext_host//[^A-Za-z0-9._-]/_}
+  ext_host=${host//[^A-Za-z0-9._-]/_}
   # Skipped only when the cache is strictly newer: bash 3.2 compares whole
   # seconds, and an install in the second of the last listing must be seen.
   [ "$ext_cache/own" -nt "$ext_json" ] && return 0
@@ -527,8 +544,9 @@ ext_post() {
     adds=$(minus "$(minus "$(minus "$set" "$(installed_of "$seen")")" "$ext_cur")" "$failed")
     while IFS= read -r e; do
       [ -n "$e" ] || continue
+      # $ext_cur is only searched line by line, and ext_publish sorts it.
       if code --install-extension "$e" >/dev/null 2>&1; then
-        ext_cur=$(sorted "$ext_cur" "$e")
+        ext_cur+=$'\n'$e
         n_added=$((n_added + 1))
       else
         # An extension built for one OS fails on the others at every run.
@@ -541,7 +559,8 @@ ext_post() {
     while IFS= read -r e; do
       if [ -z "$e" ] || ! has_line "$e" "$ext_cur"; then continue; fi
       code --uninstall-extension "$e" >/dev/null 2>&1 || continue
-      ext_cur=$(minus "$ext_cur" "$e")
+      ext_cur=$'\n'$ext_cur$'\n'
+      ext_cur=${ext_cur/$'\n'"$e"$'\n'/$'\n'}
       n_dropped=$((n_dropped + 1))
     done <<<"$removes"
     mkdir -p "$ext_cache"
@@ -552,7 +571,7 @@ ext_post() {
     # Published at once: an extension removed here before the next run must
     # have been seen in this machine's list, or the others would keep it.
     ext_publish && git -C "$src" add -- "$ext_dir/$ext_host.age" &&
-      git -C "$src" commit -q -m "sync: $ext_host extensions" &&
+      git -C "$src" commit -q -m "sync: $host extensions" &&
       git -C "$src" push -q 2>/dev/null
   fi
   [ ${#bad[@]} -gt 0 ] && say "could not install ${#bad[@]} VS Code extension(s), such as ${bad[0]}; skipped on this machine from now on"
@@ -570,8 +589,9 @@ capture_tree() {
   cd "$tdest" || return 0
   if [ -n "$mark" ]; then
     # Stamped before the scan, so an edit made during this run is newer than
-    # the stamp the next run compares with.
-    : >"$mark.next"
+    # the stamp the next run compares with. Without a source yet there is
+    # nothing to skip, so no stamp.
+    [ -d "$tsrc" ] && : >"$mark.next"
     while IFS= read -r -d '' path; do
       project_file "$path" && paths+=("$path") && list+=$path$'\n'
     done < <(git ls-files --others --exclude=node_modules -z -- "${PROJECT_SPECS[@]}")
@@ -665,7 +685,7 @@ while IFS= read -r -d '' p; do
 done < <(git -C "$src" ls-files --deleted -z)
 [ ${#tracked[@]} -gt 0 ] && git -C "$src" add -A -- "${tracked[@]}"
 if ! git -C "$src" diff --cached --quiet; then
-  git -C "$src" commit -q -m "sync: $(hostname)" || {
+  git -C "$src" commit -q -m "sync: $host" || {
     say "git commit failed; set user.name and user.email in git config"
     exit 0
   }

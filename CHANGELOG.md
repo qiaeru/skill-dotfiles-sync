@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - VS Code extensions sync: what one machine installs or removes follows on the others, and a new machine only gains extensions. An extension that fails to install, such as one built for another OS, is named once and skipped there.
 
+### Changed
+
+- The hook starts fewer processes, which shortens a sync on Windows.
+
 ## [1.2.0] - 2026-10-23
 
 ### Added
