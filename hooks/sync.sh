@@ -33,7 +33,7 @@ PROJECTS_CONF="$HOME/.config/dotfiles-sync/projects"
 project_file() {
   case "/$1" in
     */node_modules/*) return 1 ;;
-    */CLAUDE.md | */CLAUDE.local.md | */AGENTS.md) return 0 ;;
+    */CLAUDE.md | */CLAUDE.local.md | */AGENTS.md | */.mcp.json) return 0 ;;
     */.claude/settings.json | */.claude/settings.local.json) return 0 ;;
     */.claude/skills/* | */.claude/agents/* | */.claude/commands/* | \
       */.claude/hooks/* | */.claude/rules/* | */.claude/output-styles/*) return 0 ;;
@@ -46,7 +46,7 @@ project_file() {
 # untracked files the thousands that its Git ignores (builds, dependencies).
 # project_file has the final word, so this list only has to cover it.
 PROJECT_SPECS=(':(glob)**/CLAUDE.md' ':(glob)**/CLAUDE.local.md' ':(glob)**/AGENTS.md'
-  ':(glob)**/.claude/**' ':(glob)**/.vscode/**')
+  ':(glob)**/.mcp.json' ':(glob)**/.claude/**' ':(glob)**/.vscode/**')
 
 # Plain stdout of a SessionStart hook lands in Claude's context, and git prints
 # conflict notices there even with -q. Only finish() reaches the real stdout,

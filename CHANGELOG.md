@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - VS Code extensions sync: what one machine installs or removes follows on the others, and a new machine only gains extensions. An extension that fails to install, such as one built for another OS, is named once and skipped there.
+- A project's `.mcp.json` now syncs when the project's Git does not track it.
 
 ### Changed
 

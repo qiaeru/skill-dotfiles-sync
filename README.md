@@ -29,7 +29,7 @@ The hook reaches four places in your home folder (`~/.claude`, `~/.gitconfig`, `
 | Claude Code | `settings.json`, `keybindings.json`, every `*.md` at the top of `~/.claude` (`CLAUDE.md` and the files it imports), the `statusline*` script, and the `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, `themes/` folders | |
 | Git | `~/.gitconfig`, `~/.config/git/config`, `~/.config/git/ignore`, `~/.config/git/attributes` | |
 | SSH | `~/.ssh/config`, `~/.ssh/config.d/`, public keys (`*.pub`) | private keys, `known_hosts`, `authorized_keys` |
-| Projects | files the project's Git does not track, at any depth: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/settings.json` and `settings.local.json`, the `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/` folders, and the `settings`, `launch`, `tasks`, `extensions` JSON files and `*.code-snippets` of `.vscode/` | |
+| Projects | files the project's Git does not track, at any depth: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.mcp.json`, `.claude/settings.json` and `settings.local.json`, the `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/` folders, and the `settings`, `launch`, `tasks`, `extensions` JSON files and `*.code-snippets` of `.vscode/` | |
 | VS Code | `settings.json`, `keybindings.json`, `snippets/` of the user folder (`%APPDATA%\Code\User` on Windows, `~/.config/Code/User` on Linux), and the installed extensions (through the `code` command) | |
 | GitHub CLI | `config.yml` (`%APPDATA%\GitHub CLI` on Windows, `~/.config/gh` elsewhere) | |
 

@@ -27,7 +27,7 @@ The hook reaches four roots in the home folder (`.claude`, `.gitconfig`, `.confi
 | Claude Code | `settings.json`, `keybindings.json`, every `*.md` at the top of `~/.claude` (`CLAUDE.md` and the files it imports), `statusline*` (the status line script), and every file under `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, `workflows/`, `agent-memory/`, `themes/` |
 | Git | `~/.gitconfig`, `~/.config/git/config`, `~/.config/git/ignore`, `~/.config/git/attributes` |
 | SSH | `~/.ssh/config`, every file under `~/.ssh/config.d/`, `~/.ssh/*.pub` |
-| Projects | at any depth and only when the project's Git does not track them: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/settings.json`, `.claude/settings.local.json`, every file under `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, and `.vscode/` `settings.json`, `launch.json`, `tasks.json`, `extensions.json`, `*.code-snippets`; never under `node_modules/` |
+| Projects | at any depth and only when the project's Git does not track them: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.mcp.json`, `.claude/settings.json`, `.claude/settings.local.json`, every file under `.claude/` `skills/`, `agents/`, `commands/`, `hooks/`, `rules/`, `output-styles/`, and `.vscode/` `settings.json`, `launch.json`, `tasks.json`, `extensions.json`, `*.code-snippets`; never under `node_modules/` |
 | VS Code | `settings.json`, `keybindings.json`, every file under `snippets/`, and the installed extensions ([references/vscode.md](references/vscode.md)) |
 | GitHub CLI | `config.yml`, never `hosts.yml` |
 
@@ -60,7 +60,7 @@ Once the source repo exists, every Claude Code session that starts or ends on th
    ```bash
    for r in <folder>/*/; do
      git -C "$r" ls-files --others --exclude=node_modules -- ':(glob)**/CLAUDE.md' \
-       ':(glob)**/CLAUDE.local.md' ':(glob)**/AGENTS.md' ':(glob)**/.claude/**' ':(glob)**/.vscode/**' |
+       ':(glob)**/CLAUDE.local.md' ':(glob)**/AGENTS.md' ':(glob)**/.mcp.json' ':(glob)**/.claude/**' ':(glob)**/.vscode/**' |
        sed "s|^|$r|"
    done
    ```

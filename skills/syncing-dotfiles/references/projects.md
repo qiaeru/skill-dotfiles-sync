@@ -17,7 +17,7 @@ A project is known by its folder name, so `C:\Users\me\Documents\GitHub\foo` on 
 
 ## What syncs
 
-At any depth in the project, and only when the project's Git does not track the file: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.claude/settings.json`, `.claude/settings.local.json`, every file under `.claude/skills/`, `.claude/agents/`, `.claude/commands/`, `.claude/hooks/`, `.claude/rules/`, `.claude/output-styles/`, and in `.vscode/` the files `settings.json`, `launch.json`, `tasks.json`, `extensions.json`, and `*.code-snippets`. Nothing under `node_modules/` syncs, nor `.env` or `credentials.json` files. A tracked file travels with the project's own Git, so the hook leaves it alone.
+At any depth in the project, and only when the project's Git does not track the file: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `.mcp.json`, `.claude/settings.json`, `.claude/settings.local.json`, every file under `.claude/skills/`, `.claude/agents/`, `.claude/commands/`, `.claude/hooks/`, `.claude/rules/`, `.claude/output-styles/`, and in `.vscode/` the files `settings.json`, `launch.json`, `tasks.json`, `extensions.json`, and `*.code-snippets`. Nothing under `node_modules/` syncs, nor `.env` or `credentials.json` files. A tracked file travels with the project's own Git, so the hook leaves it alone.
 
 To sync another kind of file, the allow-list in `hooks/sync.sh` (`project_file`) has to change; adding it by hand with chezmoi does not work here, since each project is its own chezmoi source.
 

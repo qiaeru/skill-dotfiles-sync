@@ -323,7 +323,7 @@ check "the offline edit goes out once back online" \
 # settings.
 mkdir -p code/proj .config/dotfiles-sync "$(vscode)"
 git init -q code/proj
-printf 'CLAUDE.md\nCLAUDE.local.md\n.claude/\n.vscode/\nnode_modules/\n' >code/proj/.gitignore
+printf 'CLAUDE.md\nCLAUDE.local.md\n.mcp.json\n.claude/\n.vscode/\nnode_modules/\n' >code/proj/.gitignore
 echo 'tracked' >code/proj/AGENTS.md
 git -C code/proj add .gitignore AGENTS.md
 git -C code/proj commit -q -m init
@@ -331,6 +331,7 @@ mkdir -p code/proj/sub code/proj/.claude/skills/s code/proj/.vscode code/proj/no
 echo 'root notes' >code/proj/CLAUDE.md
 echo 'sub notes' >code/proj/sub/CLAUDE.md
 echo 'local' >code/proj/CLAUDE.local.md
+echo '{"mcpServers":{}}' >code/proj/.mcp.json
 echo '{}' >code/proj/.claude/settings.local.json
 echo 'skill' >code/proj/.claude/skills/s/SKILL.md
 echo 'TOKEN=1' >code/proj/.claude/skills/s/.env
@@ -344,7 +345,7 @@ sync >/dev/null
 remote_files=$(git --git-dir="$SB/remote.git" ls-tree -r --name-only main)
 p=.dotfiles-sync/projects/proj
 check "untracked project files reach the remote, nested ones too" \
-  '(for f in encrypted_CLAUDE.md sub/encrypted_CLAUDE.md encrypted_CLAUDE.local.md dot_claude/encrypted_settings.local.json dot_claude/skills/s/encrypted_SKILL.md dot_vscode/encrypted_settings.json; do grep -q "^$p/$f.age$" <<<"$remote_files" || exit 1; done)'
+  '(for f in encrypted_CLAUDE.md sub/encrypted_CLAUDE.md encrypted_CLAUDE.local.md encrypted_dot_mcp.json dot_claude/encrypted_settings.local.json dot_claude/skills/s/encrypted_SKILL.md dot_vscode/encrypted_settings.json; do grep -q "^$p/$f.age$" <<<"$remote_files" || exit 1; done)'
 check "tracked files, node_modules, secrets, and other files stay out" \
   '! grep -Eq "^$p/(encrypted_AGENTS|.*node_modules|.*notes|.*env)" <<<"$remote_files"'
 check "the VS Code user settings reach the remote" 'grep -q "^.dotfiles-sync/vscode/encrypted_settings.json.age$" <<<"$remote_files"'
